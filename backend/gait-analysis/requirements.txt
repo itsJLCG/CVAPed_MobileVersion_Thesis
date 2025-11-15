@@ -1,0 +1,10 @@
+# Flask and web framework
+Flask==3.1.0
+Flask-CORS==5.0.0
+
+# Scientific computing
+numpy>=1.26.0
+scipy>=1.11.0
+
+# Utilities
+python-dotenv==1.0.0

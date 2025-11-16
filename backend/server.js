@@ -31,11 +31,13 @@ const fluencyAssessmentRoutes = require('./routes/fluencyAssessment');
 const fluencyRoutes = require('./routes/fluencyRoutes');
 const receptiveRoutes = require('./routes/receptiveRoutes');
 const expressiveRoutes = require('./routes/expressiveRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
 app.use('/api/gait', gaitRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/health', healthRoutes);  // Health logs and summary
 app.use('/api/articulation', articulationRoutes);  // Progress & exercises
 app.use('/api/articulation', articulationAssessmentRoutes);  // Recording assessment
 app.use('/api/fluency', fluencyRoutes);  // Fluency progress & exercises

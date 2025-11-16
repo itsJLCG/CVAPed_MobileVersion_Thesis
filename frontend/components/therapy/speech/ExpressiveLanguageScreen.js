@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   ScrollView,
   ActivityIndicator,
   Alert
@@ -383,18 +382,18 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#8b5cf6" />
           <Text style={styles.loadingText}>Loading exercises...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (exercises.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackToSelection} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -406,7 +405,7 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
           <Ionicons name="folder-open-outline" size={64} color="#ccc" />
           <Text style={styles.emptyText}>No exercises available</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -420,7 +419,7 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
       : 0;
 
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackToSelection} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -476,12 +475,12 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
             </View>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackToSelection} style={styles.backButton}>
@@ -644,7 +643,7 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

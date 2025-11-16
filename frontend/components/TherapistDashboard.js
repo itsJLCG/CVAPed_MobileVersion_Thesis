@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Dimensions,
   ActivityIndicator,
   TextInput,
@@ -13,7 +12,6 @@ import {
   Alert,
   RefreshControl,
   Platform,
-  StatusBar,
   KeyboardAvoidingView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
@@ -1138,7 +1136,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -1898,7 +1896,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -1906,7 +1904,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',

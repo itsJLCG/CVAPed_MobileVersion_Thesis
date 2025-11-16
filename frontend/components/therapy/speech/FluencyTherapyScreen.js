@@ -4,10 +4,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   ScrollView,
-  Platform,
-  StatusBar,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -432,18 +429,18 @@ const FluencyTherapyScreen = ({ onBack }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#8e44ad" />
           <Text style={styles.loadingText}>Loading exercises...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!exercises || Object.keys(exercises).length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -454,7 +451,7 @@ const FluencyTherapyScreen = ({ onBack }) => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>No exercises available</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -463,7 +460,7 @@ const FluencyTherapyScreen = ({ onBack }) => {
   const canProceed = assessmentResult && assessmentResult.fluency_score >= 60;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -626,7 +623,7 @@ const FluencyTherapyScreen = ({ onBack }) => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -634,7 +631,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',

@@ -6,9 +6,6 @@ import {
   Dimensions,
   TouchableOpacity,
   Text,
-  SafeAreaView,
-  Platform,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,7 +13,7 @@ const { width, height } = Dimensions.get('window');
 
 const LandingPage = ({ onGetStarted }) => {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Image
           source={require('../assets/cvalogonotext.png')}
@@ -59,7 +56,7 @@ const LandingPage = ({ onGetStarted }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -67,7 +64,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   headerContainer: {
     flexDirection: 'row',

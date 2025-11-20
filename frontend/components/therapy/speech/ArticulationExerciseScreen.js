@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   Dimensions,
@@ -519,7 +518,7 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -839,7 +838,7 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

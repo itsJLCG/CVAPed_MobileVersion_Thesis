@@ -164,9 +164,9 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
 Write-Host 'Python Gait Analysis Service' -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
 Write-Host ''
-cd '$currentDir\gait-analysis'
-.\venv\Scripts\Activate.ps1
-python app.py
+Set-Location -Path '$currentDir\gait-analysis'
+& '.\venv\Scripts\Activate.ps1'
+& python app.py
 "@ -WindowStyle Normal
 
 Start-Sleep -Seconds 3
@@ -185,9 +185,9 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
 Write-Host 'Python Therapy Exercises Service' -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
 Write-Host ''
-cd '$currentDir\therapy-exercises'
-.\venv\Scripts\Activate.ps1
-python app.py
+Set-Location -Path '$currentDir\therapy-exercises'
+& '.\venv\Scripts\Activate.ps1'
+& python app.py
 "@ -WindowStyle Normal
 
 Start-Sleep -Seconds 3
@@ -206,7 +206,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
 Write-Host 'Node.js API Server' -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
 Write-Host ''
-cd '$currentDir'
+Set-Location -Path '$currentDir'
 npm run dev
 "@ -WindowStyle Normal
 

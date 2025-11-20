@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   ScrollView,
   ActivityIndicator,
   Alert
@@ -285,7 +284,7 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
     const accuracy = (correctCount / results.length * 100).toFixed(1);
 
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -323,7 +322,7 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -337,7 +336,7 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -424,7 +423,7 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

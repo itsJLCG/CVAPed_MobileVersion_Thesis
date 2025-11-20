@@ -5,11 +5,8 @@ import {
   Dimensions,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   ScrollView,
   Image,
-  Platform,
-  StatusBar,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,7 +114,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Content */}
       <ScrollView 
         style={styles.content}
@@ -275,7 +272,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
 
       {/* Bottom Navbar */}
       <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -283,7 +280,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
 
   // Content Styles

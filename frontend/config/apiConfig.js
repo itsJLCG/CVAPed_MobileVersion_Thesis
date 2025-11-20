@@ -12,7 +12,7 @@
  */
 
 // ⚠️ CHANGE THIS TO YOUR COMPUTER'S IPv4 ADDRESS ⚠️
-const BASE_IP = '192.168.1.64';
+const BASE_IP = '192.168.0.47';
 
 // Port Configuration (matches backend .env)
 const PORTS = {

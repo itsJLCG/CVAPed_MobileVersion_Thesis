@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreenExpo from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SafeAreaWrapper from './components/SafeAreaWrapper';
 import SplashScreen from './components/SplashScreen';
 import LandingPage from './components/LandingPage';
 import LoginScreen from './components/LoginScreen';
@@ -176,61 +177,61 @@ export default function App() {
 
   if (showLanding) {
     return (
-      <>
+      <SafeAreaWrapper>
         <LandingPage onGetStarted={handleGetStarted} />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
   if (showLogin) {
     return (
-      <>
+      <SafeAreaWrapper>
         <LoginScreen 
           onRegister={handleRegister}
           onLoginSuccess={handleLoginSuccess}
           onGoogleSignIn={handleGoogleSignIn}
         />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
   if (showRegister) {
     return (
-      <>
+      <SafeAreaWrapper>
         <RegisterScreen 
           onLogin={handleBackToLogin}
           onRegisterSuccess={handleRegisterSubmit}
           onGoogleSignIn={handleGoogleSignIn}
         />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
   if (showOTP) {
     return (
-      <>
+      <SafeAreaWrapper>
         <OTPScreen 
           email={userEmail}
           onVerify={handleVerifyOTP}
         />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
   if (showProfileCompletion) {
     return (
-      <>
+      <SafeAreaWrapper>
         <ProfileCompletionScreen 
           token={googleUserData?.token}
           userData={googleUserData}
           onComplete={handleProfileComplete}
         />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
@@ -238,44 +239,44 @@ export default function App() {
     // Check if user is admin and show AdminDashboard instead
     if (userData && userData.role === 'admin') {
       return (
-        <>
+        <SafeAreaWrapper>
           <AdminDashboard 
             userData={userData} 
             onLogout={handleLogout}
           />
           <StatusBar style="auto" />
-        </>
+        </SafeAreaWrapper>
       );
     }
     
     // Check if user is therapist and show TherapistDashboard
     if (userData && userData.role === 'therapist') {
       return (
-        <>
+        <SafeAreaWrapper>
           <TherapistDashboard 
             userData={userData} 
             onLogout={handleLogout}
           />
           <StatusBar style="auto" />
-        </>
+        </SafeAreaWrapper>
       );
     }
     
     return (
-      <>
+      <SafeAreaWrapper>
         <HomePage 
           userData={userData} 
           onLogout={handleLogout}
         />
         <StatusBar style="auto" />
-      </>
+      </SafeAreaWrapper>
     );
   }
 
   return (
-    <>
+    <SafeAreaWrapper>
       {/* Main app content will go here */}
       <StatusBar style="auto" />
-    </>
+    </SafeAreaWrapper>
   );
 }

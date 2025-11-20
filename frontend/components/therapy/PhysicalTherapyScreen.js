@@ -4,10 +4,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   ScrollView,
-  Platform,
-  StatusBar,
   Animated,
   Dimensions,
   Modal,
@@ -53,7 +50,7 @@ const PhysicalTherapyScreen = ({ onBack }) => {
     return <GaitAnalysisScreen onBack={() => setShowGaitAnalysis(false)} />;
   }
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -214,7 +211,7 @@ const PhysicalTherapyScreen = ({ onBack }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -222,7 +219,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   
   // Header Styles

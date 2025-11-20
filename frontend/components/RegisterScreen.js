@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Text,
   TextInput,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -628,15 +627,14 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardView}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
           <View style={styles.logoContainer}>
             <Image
               source={require('../assets/cvalogonotext.png')}
@@ -731,15 +729,10 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
   keyboardView: {
     flex: 1,
   },

@@ -451,10 +451,34 @@ export const therapyAPI = {
   },
 };
 
+// Health API endpoints
+export const healthAPI = {
+  // Get all health logs for user
+  getLogs: async () => {
+    try {
+      const response = await api.get('/health/logs');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get health summary
+  getSummary: async () => {
+    try {
+      const response = await api.get('/health/summary');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+};
+
 export default {
   ...api,
   baseURL: THERAPY_API_URL, // Export base URL for manual fetch calls
   therapyAPI,
   adminAPI,
-  authAPI
+  authAPI,
+  healthAPI
 };

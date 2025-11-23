@@ -1,6 +1,7 @@
 const ArticulationProgress = require('../models/ArticulationProgress');
 const FluencyProgress = require('../models/FluencyProgress');
 const LanguageProgress = require('../models/LanguageProgress');
+const GaitProgress = require('../models/GaitProgress');
 
 /**
  * Get all therapy progress logs for a user
@@ -8,7 +9,7 @@ const LanguageProgress = require('../models/LanguageProgress');
  */
 exports.getUserHealthLogs = async (req, res) => {
   try {
-    const userId = req.user.uid; // From auth middleware
+    const userId = req.user._id; // From auth middleware
     const logs = [];
 
     // Fetch Articulation Progress
@@ -22,7 +23,10 @@ exports.getUserHealthLogs = async (req, res) => {
         const level = levels[levelKey];
         const items = level.items || [];
         
-        items.forEach(item => {
+        // Handle items as both array and object
+        const itemsArray = Array.isArray(items) ? items : Object.values(items);
+        
+        itemsArray.forEach(item => {
           const trials = item.trials || [];
           
           trials.forEach(trial => {
@@ -60,7 +64,10 @@ exports.getUserHealthLogs = async (req, res) => {
         const level = levels[levelKey];
         const items = level.items || [];
         
-        items.forEach(item => {
+        // Handle items as both array and object
+        const itemsArray = Array.isArray(items) ? items : Object.values(items);
+        
+        itemsArray.forEach(item => {
           const attempts = item.attempts || [];
           
           attempts.forEach((attempt, attemptIndex) => {
@@ -145,6 +152,45 @@ exports.getUserHealthLogs = async (req, res) => {
       });
     });
 
+    // Fetch Gait/Physical Therapy Progress
+    const gaitProgress = await GaitProgress.find({ user_id: userId });
+    
+    gaitProgress.forEach(progress => {
+      // Calculate overall score from multiple metrics (0-100 scale)
+      const metrics = progress.metrics || {};
+      const gaitScore = (
+        (metrics.gait_symmetry || 0) * 30 +
+        (metrics.stability_score || 0) * 30 +
+        (metrics.step_regularity || 0) * 20 +
+        (metrics.data_quality === 'excellent' ? 20 : 
+         metrics.data_quality === 'good' ? 15 :
+         metrics.data_quality === 'fair' ? 10 : 5)
+      );
+      
+      logs.push({
+        id: `gait_${progress._id}`,
+        type: 'gait',
+        therapyName: 'Physical Therapy - Gait Analysis',
+        sessionId: progress.session_id,
+        score: Math.round(gaitScore),
+        metrics: {
+          stepCount: metrics.step_count || 0,
+          cadence: metrics.cadence || 0,
+          strideLength: metrics.stride_length || 0,
+          velocity: metrics.velocity || 0,
+          gaitSymmetry: metrics.gait_symmetry || 0,
+          stabilityScore: metrics.stability_score || 0,
+          stepRegularity: metrics.step_regularity || 0,
+          verticalOscillation: metrics.vertical_oscillation || 0
+        },
+        analysisDuration: progress.analysis_duration || 0,
+        dataQuality: progress.data_quality || 'fair',
+        gaitPhases: progress.gait_phases || [],
+        timestamp: progress.created_at,
+        createdAt: progress.created_at
+      });
+    });
+
     // Sort logs chronologically (newest first)
     logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -155,6 +201,7 @@ exports.getUserHealthLogs = async (req, res) => {
       fluencySessions: logs.filter(l => l.type === 'fluency').length,
       receptiveSessions: logs.filter(l => l.type === 'receptive').length,
       expressiveSessions: logs.filter(l => l.type === 'expressive').length,
+      gaitSessions: logs.filter(l => l.type === 'gait').length,
       averageScore: logs.length > 0 
         ? (logs.reduce((sum, log) => sum + (log.score || 0), 0) / logs.length).toFixed(2)
         : 0,
@@ -184,7 +231,7 @@ exports.getUserHealthLogs = async (req, res) => {
  */
 exports.getUserHealthSummary = async (req, res) => {
   try {
-    const userId = req.user.uid;
+    const userId = req.user._id;
 
     // Fetch all progress documents
     const [articulationDocs, fluencyDocs, receptiveDocs, expressiveDocs] = await Promise.all([

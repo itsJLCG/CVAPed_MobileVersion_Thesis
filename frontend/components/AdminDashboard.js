@@ -129,145 +129,242 @@ const AdminDashboard = ({ userData, onLogout }) => {
         id: 1,
         title: 'Total Users',
         value: stats.stats.total_users.toLocaleString(),
-        icon: '👥',
-        color: '#479ac3',
-        bgColor: '#479ac315'
+        icon: 'people',
+        color: '#C9302C',
+        bgColor: '#C9302C15',
+        gradient: ['#C9302C', '#E85E5A']
       },
       {
         id: 2,
         title: 'Admin Users',
         value: stats.stats.admin_users.toLocaleString(),
-        icon: '👨‍💼',
-        color: '#ce3630',
-        bgColor: '#ce363015'
+        icon: 'shield-checkmark',
+        color: '#8B4513',
+        bgColor: '#8B451315',
+        gradient: ['#8B4513', '#A0522D']
       },
       {
         id: 3,
         title: 'Verified Users',
         value: stats.stats.verified_users.toLocaleString(),
-        icon: '✅',
-        color: '#27ae60',
-        bgColor: '#27ae6015'
+        icon: 'checkmark-circle',
+        color: '#10B981',
+        bgColor: '#10B98115',
+        gradient: ['#10B981', '#34D399']
       },
       {
         id: 4,
         title: 'Patient Users',
         value: stats.stats.patient_users.toLocaleString(),
-        icon: '🏥',
-        color: '#3498db',
-        bgColor: '#3498db15'
+        icon: 'medical',
+        color: '#3B82F6',
+        bgColor: '#3B82F615',
+        gradient: ['#3B82F6', '#60A5FA']
       },
       {
         id: 5,
         title: 'Speech Therapy',
         value: stats.stats.speech_users.toLocaleString(),
-        icon: '🗣️',
-        color: '#e8b04e',
-        bgColor: '#e8b04e15'
+        icon: 'chatbubbles',
+        color: '#F59E0B',
+        bgColor: '#F59E0B15',
+        gradient: ['#F59E0B', '#FBBF24']
       },
       {
         id: 6,
         title: 'Physical Therapy',
         value: stats.stats.physical_users.toLocaleString(),
-        icon: '�',
-        color: '#9b59b6',
-        bgColor: '#9b59b615'
+        icon: 'fitness',
+        color: '#8B5CF6',
+        bgColor: '#8B5CF615',
+        gradient: ['#8B5CF6', '#A78BFA']
       }
     ];
+
+    const totalTherapy = stats.therapy_distribution.speech + stats.therapy_distribution.physical;
+    const speechPercent = totalTherapy > 0 ? (stats.therapy_distribution.speech / totalTherapy) * 100 : 0;
+    const physicalPercent = totalTherapy > 0 ? (stats.therapy_distribution.physical / totalTherapy) * 100 : 0;
 
     return (
       <ScrollView
         style={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#C9302C']} />
         }
       >
+        {/* Hero Stats Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroCard}>
+            <View style={styles.heroIconContainer}>
+              <Ionicons name="analytics" size={32} color="#fff" />
+            </View>
+            <View style={styles.heroContent}>
+              <Text style={styles.heroValue}>{stats.stats.total_users.toLocaleString()}</Text>
+              <Text style={styles.heroLabel}>Total Active Users</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          {statsCards.map(stat => (
-            <View key={stat.id} style={styles.statCard}>
-              <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
-                <Text style={styles.statIcon}>{stat.icon}</Text>
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitleMain}>Platform Statistics</Text>
+          <View style={styles.statsGrid}>
+            {statsCards.map(stat => (
+              <View key={stat.id} style={styles.statCard}>
+                <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
+                  <Ionicons name={stat.icon} size={20} color={stat.color} />
+                </View>
+                <View style={styles.statContent}>
+                  <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.title}</Text>
+                </View>
+                <View style={[styles.statAccent, { backgroundColor: stat.color }]} />
               </View>
-              <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.title}</Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
 
-        {/* Therapy Distribution */}
+        {/* Therapy Distribution - Enhanced */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Therapy Distribution</Text>
-            <View style={styles.sectionBadge}>
-              <Text style={styles.sectionBadgeText}>
-                {stats.therapy_distribution.speech + stats.therapy_distribution.physical} Total
-              </Text>
+          <View style={styles.sectionHeaderEnhanced}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="pie-chart" size={22} color="#C9302C" />
+              <Text style={styles.sectionTitle}>Therapy Distribution</Text>
+            </View>
+            <View style={styles.sectionBadgeEnhanced}>
+              <Text style={styles.sectionBadgeText}>{totalTherapy} Total</Text>
             </View>
           </View>
+          
           <View style={styles.distributionCard}>
-            <View style={styles.distributionRow}>
-              <View style={styles.distributionItem}>
-                <View style={[styles.distributionDot, { backgroundColor: '#ce3630' }]} />
-                <Text style={styles.distributionLabel}>Speech Therapy</Text>
-              </View>
-              <View style={styles.distributionValueContainer}>
-                <Text style={styles.distributionValue}>{stats.therapy_distribution.speech}</Text>
-                <Text style={styles.distributionPercent}>
-                  {((stats.therapy_distribution.speech / (stats.therapy_distribution.speech + stats.therapy_distribution.physical || 1)) * 100).toFixed(0)}%
-                </Text>
-              </View>
+            {/* Visual Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBarSegment, { 
+                width: `${speechPercent}%`, 
+                backgroundColor: '#C9302C',
+                borderTopLeftRadius: 8,
+                borderBottomLeftRadius: 8
+              }]} />
+              <View style={[styles.progressBarSegment, { 
+                width: `${physicalPercent}%`, 
+                backgroundColor: '#3B82F6',
+                borderTopRightRadius: 8,
+                borderBottomRightRadius: 8
+              }]} />
             </View>
-            <View style={styles.distributionRow}>
-              <View style={styles.distributionItem}>
-                <View style={[styles.distributionDot, { backgroundColor: '#479ac3' }]} />
-                <Text style={styles.distributionLabel}>Physical Therapy</Text>
+
+            {/* Distribution Items */}
+            <View style={styles.distributionContent}>
+              <View style={styles.distributionItemEnhanced}>
+                <View style={styles.distributionLeft}>
+                  <View style={styles.distributionIconContainer}>
+                    <Ionicons name="chatbubbles" size={20} color="#C9302C" />
+                  </View>
+                  <View>
+                    <Text style={styles.distributionLabel}>Speech Therapy</Text>
+                    <Text style={styles.distributionSubLabel}>Language & Communication</Text>
+                  </View>
+                </View>
+                <View style={styles.distributionRight}>
+                  <Text style={[styles.distributionValue, { color: '#C9302C' }]}>
+                    {stats.therapy_distribution.speech}
+                  </Text>
+                  <Text style={styles.distributionPercent}>{speechPercent.toFixed(1)}%</Text>
+                </View>
               </View>
-              <View style={styles.distributionValueContainer}>
-                <Text style={styles.distributionValue}>{stats.therapy_distribution.physical}</Text>
-                <Text style={styles.distributionPercent}>
-                  {((stats.therapy_distribution.physical / (stats.therapy_distribution.speech + stats.therapy_distribution.physical || 1)) * 100).toFixed(0)}%
-                </Text>
+
+              <View style={styles.distributionDivider} />
+
+              <View style={styles.distributionItemEnhanced}>
+                <View style={styles.distributionLeft}>
+                  <View style={styles.distributionIconContainer}>
+                    <Ionicons name="fitness" size={20} color="#3B82F6" />
+                  </View>
+                  <View>
+                    <Text style={styles.distributionLabel}>Physical Therapy</Text>
+                    <Text style={styles.distributionSubLabel}>Movement & Rehabilitation</Text>
+                  </View>
+                </View>
+                <View style={styles.distributionRight}>
+                  <Text style={[styles.distributionValue, { color: '#3B82F6' }]}>
+                    {stats.therapy_distribution.physical}
+                  </Text>
+                  <Text style={styles.distributionPercent}>{physicalPercent.toFixed(1)}%</Text>
+                </View>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Quick Stats Summary */}
+        {/* System Metrics - Enhanced */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>System Overview</Text>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Verification Rate</Text>
-              <Text style={styles.summaryValue}>
+          <View style={styles.sectionHeaderEnhanced}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="speedometer" size={22} color="#C9302C" />
+              <Text style={styles.sectionTitle}>System Metrics</Text>
+            </View>
+          </View>
+          <View style={styles.metricsGrid}>
+            <View style={styles.metricCard}>
+              <View style={styles.metricIconContainer}>
+                <Ionicons name="checkmark-done" size={24} color="#10B981" />
+              </View>
+              <Text style={styles.metricValue}>
                 {((stats.stats.verified_users / stats.stats.total_users) * 100).toFixed(1)}%
               </Text>
+              <Text style={styles.metricLabel}>Verification Rate</Text>
+              <View style={styles.metricProgressBar}>
+                <View style={[styles.metricProgress, { 
+                  width: `${(stats.stats.verified_users / stats.stats.total_users) * 100}%`,
+                  backgroundColor: '#10B981'
+                }]} />
+              </View>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Admin Coverage</Text>
-              <Text style={styles.summaryValue}>
+
+            <View style={styles.metricCard}>
+              <View style={styles.metricIconContainer}>
+                <Ionicons name="shield-checkmark" size={24} color="#8B4513" />
+              </View>
+              <Text style={styles.metricValue}>
                 {((stats.stats.admin_users / stats.stats.total_users) * 100).toFixed(1)}%
               </Text>
+              <Text style={styles.metricLabel}>Admin Coverage</Text>
+              <View style={styles.metricProgressBar}>
+                <View style={[styles.metricProgress, { 
+                  width: `${(stats.stats.admin_users / stats.stats.total_users) * 100}%`,
+                  backgroundColor: '#8B4513'
+                }]} />
+              </View>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Patient Users</Text>
-              <Text style={styles.summaryValue}>
+
+            <View style={styles.metricCard}>
+              <View style={styles.metricIconContainer}>
+                <Ionicons name="medical" size={24} color="#3B82F6" />
+              </View>
+              <Text style={styles.metricValue}>
                 {((stats.stats.patient_users / stats.stats.total_users) * 100).toFixed(1)}%
               </Text>
+              <Text style={styles.metricLabel}>Patient Users</Text>
+              <View style={styles.metricProgressBar}>
+                <View style={[styles.metricProgress, { 
+                  width: `${(stats.stats.patient_users / stats.stats.total_users) * 100}%`,
+                  backgroundColor: '#3B82F6'
+                }]} />
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Recent Users - Limit to 5 */}
+        {/* Recent Registrations - Enhanced */}
         {stats.recent_users && stats.recent_users.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Registrations</Text>
-              <Text style={styles.sectionSubtitle}>Last 5 users</Text>
+            <View style={styles.sectionHeaderEnhanced}>
+              <View style={styles.sectionTitleContainer}>
+                <Ionicons name="time" size={22} color="#C9302C" />
+                <Text style={styles.sectionTitle}>Recent Registrations</Text>
+              </View>
+              <Text style={styles.sectionSubtitleEnhanced}>Last 5 users</Text>
             </View>
             <View style={styles.recentUsersContainer}>
               {stats.recent_users.slice(0, 5).map((user, index) => {
@@ -276,22 +373,32 @@ const AdminDashboard = ({ userData, onLogout }) => {
                 
                 return (
                   <View key={index} style={styles.recentUserItem}>
-                    <View style={styles.recentUserAvatar}>
-                      <Text style={styles.recentUserAvatarText}>
-                        {initials || '??'}
-                      </Text>
-                    </View>
-                    <View style={styles.recentUserInfo}>
-                      <Text style={styles.recentUserName}>{userName}</Text>
-                      <Text style={styles.recentUserEmail}>{user.email}</Text>
+                    <View style={styles.recentUserLeft}>
+                      <View style={styles.recentUserAvatar}>
+                        <Text style={styles.recentUserAvatarText}>
+                          {initials || '??'}
+                        </Text>
+                      </View>
+                      <View style={styles.recentUserInfo}>
+                        <Text style={styles.recentUserName}>{userName}</Text>
+                        <Text style={styles.recentUserEmail}>{user.email}</Text>
+                      </View>
                     </View>
                     <View style={styles.recentUserMeta}>
                       {user.therapyType && (
                         <View style={[styles.miniTag, styles[`miniTag_${user.therapyType}`]]}>
+                          <Ionicons 
+                            name={user.therapyType === 'speech' ? 'chatbubbles' : 'fitness'} 
+                            size={10} 
+                            color={user.therapyType === 'speech' ? '#F59E0B' : '#8B5CF6'} 
+                          />
                           <Text style={styles.miniTagText}>{user.therapyType}</Text>
                         </View>
                       )}
-                      <Text style={styles.recentUserDate}>{formatDate(user.joinedAt)}</Text>
+                      <View style={styles.dateContainer}>
+                        <Ionicons name="calendar-outline" size={10} color="#999" />
+                        <Text style={styles.recentUserDate}>{formatDate(user.joinedAt)}</Text>
+                      </View>
                     </View>
                   </View>
                 );
@@ -756,9 +863,9 @@ const styles = StyleSheet.create({
   statCard: {
     width: (width - 40) / 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    borderLeftWidth: 4,
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1001,25 +1108,219 @@ const styles = StyleSheet.create({
   bottomSpacing: {
     height: 20,
   },
-  // Enhanced Overview Styles
-  statIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  // ===== ENHANCED OVERVIEW STYLES =====
+  // Hero Section
+  heroSection: {
+    padding: 15,
+    paddingTop: 20,
+  },
+  heroCard: {
+    backgroundColor: '#C9302C',
+    borderRadius: 16,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#C9302C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  heroIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginRight: 16,
+  },
+  heroContent: {
+    flex: 1,
+  },
+  heroValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  heroLabel: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  // Stats Section
+  statsSection: {
+    padding: 15,
+  },
+  sectionTitleMain: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 16,
+  },
+  statAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  // Distribution Enhanced
+  sectionHeaderEnhanced: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionBadgeEnhanced: {
+    backgroundColor: '#C9302C',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  progressBarSegment: {
+    height: '100%',
+  },
+  distributionContent: {
+    gap: 0,
+  },
+  distributionItemEnhanced: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  distributionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  distributionIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  distributionRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  distributionSubLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  distributionDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  // Metrics Grid
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: (width - 54) / 3,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  metricIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  metricValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 6,
+  },
+  metricLabel: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  metricProgressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  metricProgress: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  // Recent Users Enhanced
+  sectionSubtitleEnhanced: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '500',
+  },
+  recentUserLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  // Enhanced Overview Styles (original section preserved)
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   statContent: {
     alignItems: 'flex-start',
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
     fontWeight: '500',
   },
@@ -1046,7 +1347,7 @@ const styles = StyleSheet.create({
   sectionBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#C9302C',
+    color: '#fff',
   },
   sectionSubtitle: {
     fontSize: 14,

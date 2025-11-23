@@ -1,18 +1,4 @@
-/**
- * API Configuration
- * 
- * IMPORTANT: Change the BASE_IP to your computer's IPv4 address
- * 
- * To find your IPv4:
- * - Windows: Open CMD and type: ipconfig
- * - Look for "IPv4 Address" under your active network adapter
- * - Example: 192.168.1.64
- * 
- * Then update BASE_IP below with your IP address
- */
-
-// ⚠️ CHANGE THIS TO YOUR COMPUTER'S IPv4 ADDRESS ⚠️
-const BASE_IP = '192.168.0.47';
+const BASE_IP = '192.168.1.64';
 
 // Port Configuration (matches backend .env)
 const PORTS = {

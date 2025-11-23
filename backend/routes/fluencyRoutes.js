@@ -8,6 +8,122 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const FluencyProgress = require('../models/FluencyProgress');
 const FluencyTrial = require('../models/FluencyTrial');
+const User = require('../models/User');
+
+/**
+ * GET /api/fluency/progress/all
+ * Get all patients' fluency progress (for therapists)
+ */
+router.get('/progress/all', protect, async (req, res) => {
+  try {
+    console.log('📊 Fetching all fluency progress for therapist');
+    
+    // Get all progress records with user details
+    const progressRecords = await FluencyProgress.aggregate([
+      {
+        $addFields: {
+          userObjectId: { $toObjectId: '$user_id' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userObjectId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          user_id: 1,
+          user_name: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+          user_email: '$user.email',
+          levels: { $ifNull: ['$levels', {}] },
+          total_trials: {
+            $size: {
+              $reduce: {
+                input: { $objectToArray: { $ifNull: ['$levels', {}] } },
+                initialValue: [],
+                in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+              }
+            }
+          },
+          completed_trials: {
+            $size: {
+              $filter: {
+                input: {
+                  $reduce: {
+                    input: { $objectToArray: { $ifNull: ['$levels', {}] } },
+                    initialValue: [],
+                    in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+                  }
+                },
+                as: 'trial',
+                cond: { $eq: ['$$trial.completed', true] }
+              }
+            }
+          },
+          last_trial_date: {
+            $max: {
+              $map: {
+                input: {
+                  $reduce: {
+                    input: { $objectToArray: { $ifNull: ['$levels', {}] } },
+                    initialValue: [],
+                    in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+                  }
+                },
+                as: 'trial',
+                in: '$$trial.timestamp'
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    // Calculate average scores
+    const progressWithScores = progressRecords.map(record => {
+      const allTrials = Object.values(record.levels || {}).reduce((acc, level) => {
+        return acc.concat(level.trials || []);
+      }, []);
+      
+      const completedTrials = allTrials.filter(t => t.completed && t.score != null);
+      const avgScore = completedTrials.length > 0
+        ? completedTrials.reduce((sum, t) => sum + t.score, 0) / completedTrials.length
+        : 0;
+
+      // Get current level from the highest unlocked level
+      const levels = Object.keys(record.levels || {}).map(Number).sort((a, b) => b - a);
+      const currentLevel = levels[0] || 1;
+
+      return {
+        user_id: record.user_id,
+        user_name: record.user_name,
+        user_email: record.user_email,
+        total_trials: record.total_trials,
+        completed_trials: record.completed_trials,
+        last_trial_date: record.last_trial_date,
+        average_score: avgScore,
+        current_level: currentLevel
+      };
+    });
+
+    console.log(`✅ Found ${progressWithScores.length} progress records`);
+
+    res.json({
+      success: true,
+      progress: progressWithScores
+    });
+  } catch (error) {
+    console.error('❌ Error fetching all fluency progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch progress data'
+    });
+  }
+});
 
 /**
  * GET /api/fluency/exercises
@@ -78,9 +194,24 @@ router.get('/progress', protect, async (req, res) => {
     let currentLevel = 1;
     let currentExercise = 0;
 
+    // Get total exercises per level from database
+    const allExercises = await req.app.locals.db.collection('fluency_exercises')
+      .find({ is_active: true })
+      .sort({ level: 1, order: 1 })
+      .toArray();
+
+    // Group by level to get counts
+    const levelCounts = {};
+    allExercises.forEach(ex => {
+      levelCounts[ex.level] = (levelCounts[ex.level] || 0) + 1;
+    });
+
+    console.log('   Level exercise counts:', levelCounts);
+
     for (let level = 1; level <= 5; level++) {
       const levelKey = level.toString();
       const levelData = progress.levels[levelKey];
+      const maxExercisesInLevel = levelCounts[level] || 0;
       
       if (!levelData || !levelData.exercises) {
         currentLevel = level;
@@ -92,7 +223,7 @@ router.get('/progress', protect, async (req, res) => {
       const exercises = levelData.exercises;
       let levelComplete = true;
       
-      for (let exIdx = 0; exIdx < 10; exIdx++) {
+      for (let exIdx = 0; exIdx < maxExercisesInLevel; exIdx++) {
         const exKey = exIdx.toString();
         if (!exercises[exKey]) {
           currentLevel = level;
@@ -103,16 +234,42 @@ router.get('/progress', protect, async (req, res) => {
       }
 
       if (!levelComplete) break;
+      
+      // If this level is complete and it's not the last level, move to next level
+      if (level < 5) {
+        currentLevel = level + 1;
+        currentExercise = 0;
+      } else {
+        // All levels complete
+        currentLevel = 5;
+        currentExercise = maxExercisesInLevel;
+      }
     }
 
     console.log(`   Current position: Level ${currentLevel}, Exercise ${currentExercise}`);
+
+    // Calculate level completion status
+    const levelCompletion = {};
+    for (let level = 1; level <= 5; level++) {
+      const levelKey = level.toString();
+      const levelData = progress.levels[levelKey];
+      const maxExercisesInLevel = levelCounts[level] || 0;
+      
+      if (levelData && levelData.exercises) {
+        const completedCount = Object.keys(levelData.exercises).length;
+        levelCompletion[level] = completedCount >= maxExercisesInLevel;
+      } else {
+        levelCompletion[level] = false;
+      }
+    }
 
     res.json({
       success: true,
       has_progress: true,
       current_level: currentLevel,
       current_exercise: currentExercise,
-      levels: progress.levels || {}
+      levels: progress.levels || {},
+      level_completion: levelCompletion
     });
   } catch (error) {
     console.error('❌ Error fetching fluency progress:', error);

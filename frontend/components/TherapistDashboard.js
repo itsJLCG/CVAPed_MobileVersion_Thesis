@@ -25,8 +25,15 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [activeSubTab, setActiveSubTab] = useState('receptive');
+  const [activeProgressTab, setActiveProgressTab] = useState('physical');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Patient Progress states
+  const [fluencyProgress, setFluencyProgress] = useState([]);
+  const [languageProgress, setLanguageProgress] = useState([]);
+  const [receptiveProgress, setReceptiveProgress] = useState([]);
+  const [articulationProgress, setArticulationProgress] = useState([]);
   
   // Fluency states
   const [fluencyExercises, setFluencyExercises] = useState({});
@@ -98,6 +105,8 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   useEffect(() => {
     if (activeTab === 'fluency') {
       loadFluencyExercises();
+    } else if (activeTab === 'progress') {
+      loadPatientProgress();
     } else if (activeTab === 'language' && activeSubTab === 'expressive') {
       loadLanguageExercises();
     } else if (activeTab === 'language' && activeSubTab === 'receptive') {
@@ -138,10 +147,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     try {
       const data = await api.therapyAPI.fluency.getAll();
       
+      console.log('📥 Fluency API Response:', JSON.stringify(data, null, 2));
+      
       if (data.success) {
         // Group exercises by level
         const grouped = {};
         data.exercises.forEach(ex => {
+          console.log('Exercise data:', {
+            id: ex._id,
+            level: ex.level,
+            type: ex.type,
+            level_type: typeof ex.level,
+            type_type: typeof ex.type,
+            hasLevel: 'level' in ex,
+            hasType: 'type' in ex,
+            allKeys: Object.keys(ex)
+          });
+          
           if (!grouped[ex.level]) {
             grouped[ex.level] = {
               name: ex.level_name,
@@ -228,6 +250,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleCreateFluency = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (fluencyExercises[newFluency.level]) {
+        const duplicateOrder = fluencyExercises[newFluency.level].exercises.find(
+          ex => ex.order === newFluency.order
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(fluencyExercises, newFluency.level);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${newFluency.order} already exists in Level ${newFluency.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       const data = await api.therapyAPI.fluency.create(newFluency);
       
       if (data.success) {
@@ -255,6 +294,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleUpdateFluency = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (fluencyExercises[editingFluency.level]) {
+        const duplicateOrder = fluencyExercises[editingFluency.level].exercises.find(
+          ex => ex.order === editingFluency.order && ex._id !== editingFluency._id
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(fluencyExercises, editingFluency.level, editingFluency._id);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${editingFluency.order} already exists in Level ${editingFluency.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Send only the editable fields
       const updates = {
         level: editingFluency.level,
@@ -263,6 +319,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
         target: editingFluency.target,
         expected_duration: editingFluency.expected_duration,
         breathing: editingFluency.breathing,
+        order: editingFluency.order,
         is_active: editingFluency.is_active
       };
       
@@ -283,8 +340,142 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     setShowFluencyModal(true);
   };
 
+  // Helper to get level display name
+  const getLevelName = (level) => {
+    const levels = {
+      1: 'Level 1 - Breathing & Single Words',
+      2: 'Level 2 - Short Phrases',
+      3: 'Level 3 - Complete Sentences',
+      4: 'Level 4 - Reading Passages',
+      5: 'Level 5 - Spontaneous Speech'
+    };
+    return levels[level] || 'Unknown Level';
+  };
+
+  // Helper to get type display name
+  const getTypeName = (type) => {
+    const types = {
+      'controlled-breathing': 'Controlled Breathing',
+      'short-phrase': 'Short Phrase',
+      'sentence': 'Sentence',
+      'passage': 'Passage',
+      'spontaneous': 'Spontaneous'
+    };
+    return types[type] || type;
+  };
+
+  // Helper for Language level names
+  const getLanguageLevelName = (level) => {
+    const levels = {
+      1: 'Level 1 - Picture Description',
+      2: 'Level 2 - Sentence Formation',
+      3: 'Level 3 - Story Retell'
+    };
+    return levels[level] || 'Unknown Level';
+  };
+
+  // Helper for Language type names
+  const getLanguageTypeName = (type) => {
+    const types = {
+      'description': 'Description',
+      'sentence': 'Sentence',
+      'retell': 'Retell'
+    };
+    return types[type] || type;
+  };
+
+  // Helper for Receptive level names
+  const getReceptiveLevelName = (level) => {
+    const levels = {
+      1: 'Level 1 - Vocabulary',
+      2: 'Level 2 - Directions',
+      3: 'Level 3 - Comprehension'
+    };
+    return levels[level] || 'Unknown Level';
+  };
+
+  // Helper for Receptive type names
+  const getReceptiveTypeName = (type) => {
+    const types = {
+      'vocabulary': 'Vocabulary',
+      'directions': 'Directions',
+      'comprehension': 'Comprehension'
+    };
+    return types[type] || type;
+  };
+
+  // Helper for Articulation level names
+  const getArticulationLevelName = (level) => {
+    const levels = {
+      1: 'Level 1 - Sound',
+      2: 'Level 2 - Syllable',
+      3: 'Level 3 - Word',
+      4: 'Level 4 - Phrase',
+      5: 'Level 5 - Sentence'
+    };
+    return levels[level] || 'Unknown Level';
+  };
+
+  // Helper for Articulation sound names
+  const getArticulationSoundName = (sound) => {
+    const sounds = {
+      's': 'S Sound',
+      'r': 'R Sound',
+      'l': 'L Sound',
+      'k': 'K Sound',
+      'th': 'TH Sound'
+    };
+    return sounds[sound] || sound;
+  };
+
+  // Helper to get available order numbers for a specific level
+  const getAvailableOrders = (exercises, selectedLevel, currentEditingId = null) => {
+    if (!exercises || !exercises[selectedLevel]) {
+      return [1]; // Only suggest next sequential number
+    }
+    
+    const levelExercises = exercises[selectedLevel].exercises || [];
+    const usedOrders = levelExercises
+      .filter(ex => ex._id !== currentEditingId) // Exclude current exercise when editing
+      .map(ex => ex.order)
+      .sort((a, b) => a - b);
+    
+    if (usedOrders.length === 0) {
+      return [1];
+    }
+    
+    // Find ALL gaps in sequence and add the next number after max
+    const available = [];
+    const maxOrder = Math.max(...usedOrders);
+    
+    // Check for gaps from 1 to max
+    for (let i = 1; i <= maxOrder; i++) {
+      if (!usedOrders.includes(i)) {
+        available.push(i);
+      }
+    }
+    
+    // Always add next sequential number after the highest
+    available.push(maxOrder + 1);
+    
+    return available;
+  };
+
   const openEditFluencyModal = (exercise) => {
-    setEditingFluency(exercise);
+    // Ensure proper data types for Picker components
+    const editData = {
+      ...exercise,
+      level: exercise.level ? parseInt(exercise.level) : 1,
+      order: exercise.order ? parseInt(exercise.order) : 1,
+      expected_duration: exercise.expected_duration ? parseInt(exercise.expected_duration) : 3,
+      type: exercise.type || 'controlled-breathing',
+      instruction: exercise.instruction || '',
+      target: exercise.target || '',
+      breathing: exercise.breathing !== undefined ? exercise.breathing : false,
+      is_active: exercise.is_active !== undefined ? exercise.is_active : true
+    };
+    
+    setEditingFluency(editData);
     setShowFluencyModal(true);
   };
 
@@ -377,6 +568,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleCreateLanguage = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (languageExercises[newLanguage.level]) {
+        const duplicateOrder = languageExercises[newLanguage.level].exercises.find(
+          ex => ex.order === newLanguage.order
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(languageExercises, newLanguage.level);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${newLanguage.order} already exists in Level ${newLanguage.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Convert comma-separated keywords to array
       let exerciseData = { ...newLanguage };
       if (typeof exerciseData.expected_keywords === 'string') {
@@ -410,6 +618,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleUpdateLanguage = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (languageExercises[editingLanguage.level]) {
+        const duplicateOrder = languageExercises[editingLanguage.level].exercises.find(
+          ex => ex.order === editingLanguage.order && ex._id !== editingLanguage._id
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(languageExercises, editingLanguage.level, editingLanguage._id);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${editingLanguage.order} already exists in Level ${editingLanguage.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Send only the editable fields
       const updates = {
         level: editingLanguage.level,
@@ -440,7 +665,12 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   };
 
   const openEditLanguageModal = (exercise) => {
-    setEditingLanguage(exercise);
+    // Ensure level is a number for the Picker component
+    setEditingLanguage({
+      ...exercise,
+      level: parseInt(exercise.level) || 1,
+      order: parseInt(exercise.order) || 1
+    });
     setShowLanguageModal(true);
   };
 
@@ -535,6 +765,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleCreateReceptive = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (receptiveExercises[newReceptive.level]) {
+        const duplicateOrder = receptiveExercises[newReceptive.level].exercises.find(
+          ex => ex.order === newReceptive.order
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(receptiveExercises, newReceptive.level);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${newReceptive.order} already exists in Level ${newReceptive.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Transform options from form format {text, emoji} to simple strings for backend
       const optionsToSend = newReceptive.options.map(opt => opt.text);
       
@@ -579,6 +826,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleUpdateReceptive = async () => {
     try {
+      // Validate order is not duplicated in the same level
+      if (receptiveExercises[editingReceptive.level]) {
+        const duplicateOrder = receptiveExercises[editingReceptive.level].exercises.find(
+          ex => ex.order === editingReceptive.order && ex._id !== editingReceptive._id
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(receptiveExercises, editingReceptive.level, editingReceptive._id);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${editingReceptive.order} already exists in Level ${editingReceptive.level}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Transform options from form format {text, emoji} to simple strings for backend
       const optionsToSend = editingReceptive.options.map(opt => opt.text);
       
@@ -616,6 +880,8 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     // Transform options from backend format (with image/shape) to form format (with emoji)
     const transformedExercise = {
       ...exercise,
+      level: parseInt(exercise.level) || 1,
+      order: parseInt(exercise.order) || 1,
       options: exercise.options.map(opt => ({
         text: opt.text || '',
         emoji: opt.image || opt.shape || ''
@@ -705,6 +971,24 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleCreateArticulation = async () => {
     try {
+      // Validate order is not duplicated in the same level for the same sound
+      const soundExercises = articulationExercises[newArticulation.sound_id]?.levels || {};
+      if (soundExercises[newArticulation.level]) {
+        const duplicateOrder = soundExercises[newArticulation.level].exercises.find(
+          ex => ex.order === newArticulation.order
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(soundExercises, newArticulation.level);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${newArticulation.order} already exists in Level ${newArticulation.level} for ${getArticulationSoundName(newArticulation.sound_id)}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       const data = await api.therapyAPI.articulation.create(newArticulation);
       
       if (data.success) {
@@ -726,6 +1010,24 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const handleUpdateArticulation = async () => {
     try {
+      // Validate order is not duplicated in the same level for the same sound
+      const soundExercises = articulationExercises[editingArticulation.sound_id]?.levels || {};
+      if (soundExercises[editingArticulation.level]) {
+        const duplicateOrder = soundExercises[editingArticulation.level].exercises.find(
+          ex => ex.order === editingArticulation.order && ex._id !== editingArticulation._id
+        );
+        
+        if (duplicateOrder) {
+          const availableOrders = getAvailableOrders(soundExercises, editingArticulation.level, editingArticulation._id);
+          Alert.alert(
+            'Duplicate Order',
+            `Order ${editingArticulation.order} already exists in Level ${editingArticulation.level} for ${getArticulationSoundName(editingArticulation.sound_id)}.\n\nAvailable orders: ${availableOrders.join(', ')}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       // Send only the editable fields
       const updates = {
         sound_id: editingArticulation.sound_id,
@@ -754,11 +1056,41 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   };
 
   const openEditArticulationModal = (exercise) => {
-    setEditingArticulation(exercise);
+    // Ensure sound and level fields are properly formatted for Picker
+    setEditingArticulation({
+      ...exercise,
+      level: parseInt(exercise.level) || 1,
+      order: parseInt(exercise.order) || 1
+    });
     setShowArticulationModal(true);
   };
 
   // ==================== RENDER FUNCTIONS ====================
+  const loadPatientProgress = async () => {
+    try {
+      setLoading(true);
+      const [fluencyRes, languageRes, receptiveRes, articulationRes] = await Promise.all([
+        api.therapyAPI.fluency.getAllProgress(),
+        api.therapyAPI.language.getAllProgress(),
+        api.therapyAPI.receptive.getAllProgress(),
+        api.therapyAPI.articulation.getAllProgress()
+      ]);
+      
+      console.log('Fluency Response:', JSON.stringify(fluencyRes, null, 2));
+      console.log('Articulation Response:', JSON.stringify(articulationRes, null, 2));
+      
+      if (fluencyRes.success) setFluencyProgress(fluencyRes.progress || []);
+      if (languageRes.success) setLanguageProgress(languageRes.progress || []);
+      if (receptiveRes.success) setReceptiveProgress(receptiveRes.progress || []);
+      if (articulationRes.success) setArticulationProgress(articulationRes.progress || []);
+    } catch (error) {
+      console.error('Error loading patient progress:', error);
+      Alert.alert('Error', 'Failed to load patient progress');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderOverview = () => (
     <View style={styles.overviewContainer}>
       <View style={styles.welcomeCard}>
@@ -1135,6 +1467,186 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     );
   };
 
+  const renderProgressTab = () => {
+    const renderProgressList = (progressData, therapyType) => {
+      if (progressData.length === 0) {
+        return (
+          <View style={styles.emptyState}>
+            <Ionicons name="clipboard-outline" size={60} color="#ccc" />
+            <Text style={styles.emptyStateText}>No patient progress data yet</Text>
+          </View>
+        );
+      }
+
+      return (
+        <ScrollView 
+          style={styles.progressList}
+          contentContainerStyle={styles.progressListContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={loadPatientProgress} />
+          }
+        >
+          {progressData.map((progress, index) => {
+            // Ensure all values are primitives (strings/numbers) to avoid rendering errors
+            const safeProgress = {
+              user_name: String(progress.user_name || 'Unknown Patient'),
+              user_email: String(progress.user_email || 'N/A'),
+              total_trials: Number(progress.total_trials) || 0,
+              completed_trials: Number(progress.completed_trials) || 0,
+              average_score: Number(progress.average_score) || 0,
+              current_level: Number(progress.current_level) || 0,
+              last_trial_date: progress.last_trial_date
+            };
+            
+            return (
+            <View key={index} style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <View style={styles.progressPatientInfo}>
+                  <View style={styles.progressAvatar}>
+                    <Text style={styles.progressAvatarText}>
+                      {safeProgress.user_name.charAt(0)}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.progressPatientName}>
+                      {safeProgress.user_name}
+                    </Text>
+                    <Text style={styles.progressPatientEmail}>
+                      {safeProgress.user_email}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressStatValue}>{safeProgress.total_trials}</Text>
+                  <Text style={styles.progressStatLabel}>Trials</Text>
+                </View>
+              </View>
+
+              <View style={styles.progressDetails}>
+                <View style={styles.progressDetailRow}>
+                  <View style={styles.progressDetailItem}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.progressDetailLabel}>Completed:</Text>
+                    <Text style={[styles.progressDetailValue, {color: '#10B981'}]}>
+                      {safeProgress.completed_trials}
+                    </Text>
+                  </View>
+                  <View style={styles.progressDetailItem}>
+                    <Ionicons name="trending-up" size={16} color="#3B82F6" />
+                    <Text style={styles.progressDetailLabel}>Avg Score:</Text>
+                    <Text style={[styles.progressDetailValue, {color: '#3B82F6'}]}>
+                      {safeProgress.average_score ? `${safeProgress.average_score.toFixed(1)}%` : 'N/A'}
+                    </Text>
+                  </View>
+                </View>
+
+                {safeProgress.current_level > 0 && (
+                  <View style={styles.progressLevelBadge}>
+                    <Ionicons name="trophy" size={14} color="#F59E0B" />
+                    <Text style={styles.progressLevelText}>
+                      Current Level: {safeProgress.current_level}
+                    </Text>
+                  </View>
+                )}
+
+                {safeProgress.last_trial_date && (
+                  <View style={styles.progressFooter}>
+                    <Ionicons name="time-outline" size={12} color="#999" />
+                    <Text style={styles.progressLastTrial}>
+                      Last activity: {new Date(safeProgress.last_trial_date).toLocaleDateString()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            );
+          })}
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      );
+    };
+
+    return (
+      <View style={styles.tabContent}>
+        {/* Sub-navigation for progress types */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subTabNav}>
+          <TouchableOpacity
+            style={[styles.subTab, activeProgressTab === 'physical' && styles.subTabActive]}
+            onPress={() => setActiveProgressTab('physical')}
+          >
+            <Ionicons name="fitness" size={14} color={activeProgressTab === 'physical' ? '#C9302C' : '#666'} />
+            <Text style={[styles.subTabText, activeProgressTab === 'physical' && styles.subTabTextActive]}>
+              Physical
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTab, activeProgressTab === 'articulation' && styles.subTabActive]}
+            onPress={() => setActiveProgressTab('articulation')}
+          >
+            <Ionicons name="mic" size={14} color={activeProgressTab === 'articulation' ? '#C9302C' : '#666'} />
+            <Text style={[styles.subTabText, activeProgressTab === 'articulation' && styles.subTabTextActive]}>
+              Articulation
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTab, activeProgressTab === 'receptive' && styles.subTabActive]}
+            onPress={() => setActiveProgressTab('receptive')}
+          >
+            <Ionicons name="ear" size={14} color={activeProgressTab === 'receptive' ? '#C9302C' : '#666'} />
+            <Text style={[styles.subTabText, activeProgressTab === 'receptive' && styles.subTabTextActive]}>
+              Receptive
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTab, activeProgressTab === 'expressive' && styles.subTabActive]}
+            onPress={() => setActiveProgressTab('expressive')}
+          >
+            <Ionicons name="chatbubbles" size={14} color={activeProgressTab === 'expressive' ? '#C9302C' : '#666'} />
+            <Text style={[styles.subTabText, activeProgressTab === 'expressive' && styles.subTabTextActive]}>
+              Expressive
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTab, activeProgressTab === 'fluency' && styles.subTabActive]}
+            onPress={() => setActiveProgressTab('fluency')}
+          >
+            <Ionicons name="musical-notes" size={14} color={activeProgressTab === 'fluency' ? '#C9302C' : '#666'} />
+            <Text style={[styles.subTabText, activeProgressTab === 'fluency' && styles.subTabTextActive]}>
+              Fluency
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Progress Content */}
+        <View style={styles.progressContent}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#C9302C" />
+              <Text style={styles.loadingText}>Loading patient progress...</Text>
+            </View>
+          ) : (
+            <>
+              {activeProgressTab === 'physical' && (
+                <View style={styles.physicalPlaceholder}>
+                  <Ionicons name="fitness" size={60} color="#ccc" />
+                  <Text style={styles.emptyStateText}>Physical Therapy progress tracking coming soon</Text>
+                </View>
+              )}
+              {activeProgressTab === 'articulation' && renderProgressList(articulationProgress, 'articulation')}
+              {activeProgressTab === 'receptive' && renderProgressList(receptiveProgress, 'receptive')}
+              {activeProgressTab === 'expressive' && renderProgressList(languageProgress, 'expressive')}
+              {activeProgressTab === 'fluency' && renderProgressList(fluencyProgress, 'fluency')}
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1208,6 +1720,20 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
             Fluency
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'progress' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('progress')}
+        >
+          <Ionicons 
+            name="analytics" 
+            size={16} 
+            color={activeTab === 'progress' ? '#FFF' : '#666'} 
+          />
+          <Text style={[styles.tabButtonText, activeTab === 'progress' && styles.tabButtonTextActive]}>
+            Patient Progress
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Content */}
@@ -1216,6 +1742,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
         {activeTab === 'fluency' && renderFluencyTab()}
         {activeTab === 'language' && renderLanguageTab()}
         {activeTab === 'articulation' && renderArticulationTab()}
+        {activeTab === 'progress' && renderProgressTab()}
       </View>
 
       {/* Fluency Modal */}
@@ -1250,13 +1777,28 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               contentContainerStyle={styles.modalFormContent}
             >
               <Text style={styles.label}>Level</Text>
+              {editingFluency && (
+                <Text style={styles.currentValueText}>
+                  Current: {getLevelName(editingFluency.level)}
+                </Text>
+              )}
+              {!editingFluency && (
+                <Text style={styles.selectionText}>
+                  Selected: {getLevelName(newFluency.level)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingFluency ? editingFluency.level : newFluency.level}
-                  onValueChange={(value) => editingFluency 
-                    ? setEditingFluency({...editingFluency, level: value})
-                    : setNewFluency({...newFluency, level: value})
-                  }
+                  onValueChange={(value) => {
+                    if (editingFluency) {
+                      setEditingFluency({...editingFluency, level: value});
+                    } else {
+                      // Suggest first available order for new exercise
+                      const availableOrders = getAvailableOrders(fluencyExercises, value);
+                      setNewFluency({...newFluency, level: value, order: availableOrders[0] || 1});
+                    }
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="Level 1 - Breathing & Single Words" value={1} />
@@ -1268,13 +1810,24 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Type</Text>
+              {editingFluency && (
+                <Text style={styles.currentValueText}>
+                  Current: {getTypeName(editingFluency.type)}
+                </Text>
+              )}
+              {!editingFluency && (
+                <Text style={styles.selectionText}>
+                  Selected: {getTypeName(newFluency.type)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingFluency ? editingFluency.type : newFluency.type}
-                  onValueChange={(value) => editingFluency 
-                    ? setEditingFluency({...editingFluency, type: value})
-                    : setNewFluency({...newFluency, type: value})
-                  }
+                  onValueChange={(value) => {
+                    editingFluency 
+                      ? setEditingFluency({...editingFluency, type: value})
+                      : setNewFluency({...newFluency, type: value});
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="Controlled Breathing" value="controlled-breathing" />
@@ -1286,15 +1839,39 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Order (within level)</Text>
+              {editingFluency && (
+                <Text style={styles.currentValueText}>
+                  Current order: {editingFluency.order}
+                </Text>
+              )}
+              {!editingFluency && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    fluencyExercises, 
+                    newFluency.level
+                  ).join(', ')}
+                </Text>
+              )}
+              {editingFluency && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    fluencyExercises, 
+                    editingFluency.level,
+                    editingFluency._id
+                  ).join(', ')}
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
-                value={String(editingFluency ? editingFluency.order : newFluency.order)}
-                onChangeText={(text) => editingFluency 
-                  ? setEditingFluency({...editingFluency, order: parseInt(text) || 1})
-                  : setNewFluency({...newFluency, order: parseInt(text) || 1})
-                }
+                value={editingFluency ? String(editingFluency.order || '') : String(newFluency.order || '')}
+                onChangeText={(text) => {
+                  const numValue = text === '' ? '' : parseInt(text) || '';
+                  editingFluency 
+                    ? setEditingFluency({...editingFluency, order: numValue})
+                    : setNewFluency({...newFluency, order: numValue});
+                }}
                 keyboardType="numeric"
-                placeholder="1"
+                placeholder="Enter order number"
               />
 
               <Text style={styles.label}>Instruction</Text>
@@ -1421,13 +1998,28 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               contentContainerStyle={styles.modalFormContent}
             >
               <Text style={styles.label}>Level</Text>
+              {editingLanguage && (
+                <Text style={styles.currentValueText}>
+                  Current: {getLanguageLevelName(editingLanguage.level)}
+                </Text>
+              )}
+              {!editingLanguage && (
+                <Text style={styles.selectionText}>
+                  Selected: {getLanguageLevelName(newLanguage.level)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingLanguage ? editingLanguage.level : newLanguage.level}
-                  onValueChange={(value) => editingLanguage 
-                    ? setEditingLanguage({...editingLanguage, level: value})
-                    : setNewLanguage({...newLanguage, level: value})
-                  }
+                  onValueChange={(value) => {
+                    if (editingLanguage) {
+                      setEditingLanguage({...editingLanguage, level: value});
+                    } else {
+                      // Suggest first available order for new exercise
+                      const availableOrders = getAvailableOrders(languageExercises, value);
+                      setNewLanguage({...newLanguage, level: value, order: availableOrders[0] || 1});
+                    }
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="Level 1 - Picture Description" value={1} />
@@ -1437,6 +2029,16 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Type</Text>
+              {editingLanguage && (
+                <Text style={styles.currentValueText}>
+                  Current: {getLanguageTypeName(editingLanguage.type)}
+                </Text>
+              )}
+              {!editingLanguage && (
+                <Text style={styles.selectionText}>
+                  Selected: {getLanguageTypeName(newLanguage.type)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingLanguage ? editingLanguage.type : newLanguage.type}
@@ -1453,15 +2055,39 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Order (within level)</Text>
+              {editingLanguage && (
+                <Text style={styles.currentValueText}>
+                  Current order: {editingLanguage.order}
+                </Text>
+              )}
+              {!editingLanguage && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    languageExercises, 
+                    newLanguage.level
+                  ).join(', ')}
+                </Text>
+              )}
+              {editingLanguage && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    languageExercises, 
+                    editingLanguage.level,
+                    editingLanguage._id
+                  ).join(', ')}
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
-                value={String(editingLanguage ? editingLanguage.order : newLanguage.order)}
-                onChangeText={(text) => editingLanguage 
-                  ? setEditingLanguage({...editingLanguage, order: parseInt(text) || 1})
-                  : setNewLanguage({...newLanguage, order: parseInt(text) || 1})
-                }
+                value={editingLanguage ? String(editingLanguage.order || '') : String(newLanguage.order || '')}
+                onChangeText={(text) => {
+                  const numValue = text === '' ? '' : parseInt(text) || '';
+                  editingLanguage 
+                    ? setEditingLanguage({...editingLanguage, order: numValue})
+                    : setNewLanguage({...newLanguage, order: numValue});
+                }}
                 keyboardType="numeric"
-                placeholder="1"
+                placeholder="Enter order number"
               />
 
               <Text style={styles.label}>Instruction</Text>
@@ -1589,13 +2215,28 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               contentContainerStyle={styles.modalFormContent}
             >
               <Text style={styles.label}>Level</Text>
+              {editingReceptive && (
+                <Text style={styles.currentValueText}>
+                  Current: {getReceptiveLevelName(editingReceptive.level)}
+                </Text>
+              )}
+              {!editingReceptive && (
+                <Text style={styles.selectionText}>
+                  Selected: {getReceptiveLevelName(newReceptive.level)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingReceptive ? editingReceptive.level : newReceptive.level}
-                  onValueChange={(value) => editingReceptive 
-                    ? setEditingReceptive({...editingReceptive, level: value})
-                    : setNewReceptive({...newReceptive, level: value})
-                  }
+                  onValueChange={(value) => {
+                    if (editingReceptive) {
+                      setEditingReceptive({...editingReceptive, level: value});
+                    } else {
+                      // Suggest first available order for new exercise
+                      const availableOrders = getAvailableOrders(receptiveExercises, value);
+                      setNewReceptive({...newReceptive, level: value, order: availableOrders[0] || 1});
+                    }
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="Level 1 - Vocabulary" value={1} />
@@ -1605,6 +2246,16 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Type</Text>
+              {editingReceptive && (
+                <Text style={styles.currentValueText}>
+                  Current: {getReceptiveTypeName(editingReceptive.type)}
+                </Text>
+              )}
+              {!editingReceptive && (
+                <Text style={styles.selectionText}>
+                  Selected: {getReceptiveTypeName(newReceptive.type)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingReceptive ? editingReceptive.type : newReceptive.type}
@@ -1621,15 +2272,39 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Order (within level)</Text>
+              {editingReceptive && (
+                <Text style={styles.currentValueText}>
+                  Current order: {editingReceptive.order}
+                </Text>
+              )}
+              {!editingReceptive && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    receptiveExercises, 
+                    newReceptive.level
+                  ).join(', ')}
+                </Text>
+              )}
+              {editingReceptive && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    receptiveExercises, 
+                    editingReceptive.level,
+                    editingReceptive._id
+                  ).join(', ')}
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
-                value={String(editingReceptive ? editingReceptive.order : newReceptive.order)}
-                onChangeText={(text) => editingReceptive 
-                  ? setEditingReceptive({...editingReceptive, order: parseInt(text) || 1})
-                  : setNewReceptive({...newReceptive, order: parseInt(text) || 1})
-                }
+                value={editingReceptive ? String(editingReceptive.order || '') : String(newReceptive.order || '')}
+                onChangeText={(text) => {
+                  const numValue = text === '' ? '' : parseInt(text) || '';
+                  editingReceptive 
+                    ? setEditingReceptive({...editingReceptive, order: numValue})
+                    : setNewReceptive({...newReceptive, order: numValue});
+                }}
                 keyboardType="numeric"
-                placeholder="1"
+                placeholder="Enter order number"
               />
 
               <Text style={styles.label}>Target</Text>
@@ -1798,13 +2473,32 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               contentContainerStyle={styles.modalFormContent}
             >
               <Text style={styles.label}>Sound</Text>
+              {editingArticulation && (
+                <Text style={styles.currentValueText}>
+                  Current: {getArticulationSoundName(editingArticulation.sound_id)}
+                </Text>
+              )}
+              {!editingArticulation && (
+                <Text style={styles.selectionText}>
+                  Selected: {getArticulationSoundName(newArticulation.sound_id)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingArticulation ? editingArticulation.sound_id : newArticulation.sound_id}
-                  onValueChange={(value) => editingArticulation 
-                    ? setEditingArticulation({...editingArticulation, sound_id: value})
-                    : setNewArticulation({...newArticulation, sound_id: value})
-                  }
+                  onValueChange={(value) => {
+                    if (editingArticulation) {
+                      setEditingArticulation({...editingArticulation, sound_id: value});
+                    } else {
+                      // Update sound and recalculate available order for the new sound
+                      const soundExercises = articulationExercises[value]?.levels || {};
+                      const availableOrders = getAvailableOrders(
+                        soundExercises, 
+                        newArticulation.level
+                      );
+                      setNewArticulation({...newArticulation, sound_id: value, order: availableOrders[0] || 1});
+                    }
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="S Sound" value="s" />
@@ -1816,13 +2510,32 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Level</Text>
+              {editingArticulation && (
+                <Text style={styles.currentValueText}>
+                  Current: {getArticulationLevelName(editingArticulation.level)}
+                </Text>
+              )}
+              {!editingArticulation && (
+                <Text style={styles.selectionText}>
+                  Selected: {getArticulationLevelName(newArticulation.level)}
+                </Text>
+              )}
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={editingArticulation ? editingArticulation.level : newArticulation.level}
-                  onValueChange={(value) => editingArticulation 
-                    ? setEditingArticulation({...editingArticulation, level: value})
-                    : setNewArticulation({...newArticulation, level: value})
-                  }
+                  onValueChange={(value) => {
+                    if (editingArticulation) {
+                      setEditingArticulation({...editingArticulation, level: value});
+                    } else {
+                      // Suggest first available order for new exercise using current sound_id
+                      const soundExercises = articulationExercises[newArticulation.sound_id]?.levels || {};
+                      const availableOrders = getAvailableOrders(
+                        soundExercises, 
+                        value
+                      );
+                      setNewArticulation({...newArticulation, level: value, order: availableOrders[0] || 1});
+                    }
+                  }}
                   style={styles.picker}
                 >
                   <Picker.Item label="Level 1 - Sound" value={1} />
@@ -1834,15 +2547,39 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
               </View>
 
               <Text style={styles.label}>Order (within level)</Text>
+              {editingArticulation && (
+                <Text style={styles.currentValueText}>
+                  Current order: {editingArticulation.order}
+                </Text>
+              )}
+              {!editingArticulation && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    articulationExercises[newArticulation.sound_id]?.levels || {}, 
+                    newArticulation.level
+                  ).join(', ')}
+                </Text>
+              )}
+              {editingArticulation && (
+                <Text style={styles.recommendationText}>
+                  Available orders: {getAvailableOrders(
+                    articulationExercises[editingArticulation.sound_id]?.levels || {}, 
+                    editingArticulation.level,
+                    editingArticulation._id
+                  ).join(', ')}
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
-                value={String(editingArticulation ? editingArticulation.order : newArticulation.order)}
-                onChangeText={(text) => editingArticulation 
-                  ? setEditingArticulation({...editingArticulation, order: parseInt(text) || 1})
-                  : setNewArticulation({...newArticulation, order: parseInt(text) || 1})
-                }
+                value={editingArticulation ? String(editingArticulation.order || '') : String(newArticulation.order || '')}
+                onChangeText={(text) => {
+                  const numValue = text === '' ? '' : parseInt(text) || '';
+                  editingArticulation 
+                    ? setEditingArticulation({...editingArticulation, order: numValue})
+                    : setNewArticulation({...newArticulation, order: numValue});
+                }}
                 keyboardType="numeric"
-                placeholder="1"
+                placeholder="Enter order number"
               />
 
               <Text style={styles.label}>Target</Text>
@@ -1939,14 +2676,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
     paddingHorizontal: 8,
-    paddingVertical: 6,
-    maxHeight: 50,
+    paddingVertical: 3,
+    maxHeight: 40,
   },
   tabButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     marginHorizontal: 3,
     borderRadius: 6,
     backgroundColor: '#F8F9FA',
@@ -1955,10 +2692,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#C9302C',
   },
   tabButtonText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: '#666',
-    marginLeft: 5,
+    marginLeft: 4,
   },
   tabButtonTextActive: {
     color: '#FFFFFF',
@@ -2218,17 +2955,28 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E0E0',
   },
   subTab: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    marginRight: 12,
-    borderBottomWidth: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginRight: 5,
+    borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   subTabActive: {
     borderBottomColor: '#C9302C',
   },
+  subTabNav: {
+    maxHeight: 32,
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
   subTabText: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: '#94A3B8',
   },
@@ -2367,6 +3115,42 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
+  currentValueText: {
+    fontSize: 13,
+    color: '#10B981',
+    fontWeight: '600',
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10B981',
+  },
+  recommendationText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '500',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3B82F6',
+  },
+  selectionText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#9CA3AF',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -2456,6 +3240,138 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  // ===== PATIENT PROGRESS STYLES =====
+  progressList: {
+    flex: 1,
+  },
+  progressListContent: {
+    paddingBottom: 80,
+    paddingTop: 10,
+  },
+  progressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 15,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  progressPatientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  progressAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#C9302C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  progressAvatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  progressPatientName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 2,
+  },
+  progressPatientEmail: {
+    fontSize: 13,
+    color: '#999',
+  },
+  progressStats: {
+    alignItems: 'center',
+    backgroundColor: '#C9302C15',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  progressStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#C9302C',
+  },
+  progressStatLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
+  },
+  progressDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 12,
+  },
+  progressDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  progressDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  progressDetailLabel: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  progressDetailValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  progressLevelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B15',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  progressLevelText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '600',
+  },
+  progressFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  progressLastTrial: {
+    fontSize: 11,
+    color: '#999',
+  },
+  progressContent: {
+    flex: 1,
+  },
+  physicalPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
   },
 });
 

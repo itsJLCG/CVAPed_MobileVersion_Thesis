@@ -36,23 +36,36 @@ const FluencyTherapyScreen = ({ onBack }) => {
   const recordingRef = useRef(null);
 
   useEffect(() => {
-    loadExercises();
-    loadProgress();
+    // Load exercises first, then progress
+    const initialize = async () => {
+      await loadExercises();
+      await loadProgress();
+    };
+    initialize();
   }, []);
 
   const loadExercises = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
+      console.log('📡 Fetching fluency exercises...');
       const response = await api.get('/fluency/exercises', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('📥 Response received:', JSON.stringify(response.data, null, 2));
+
       if (response.data.success) {
-        setExercises(response.data.levels);
+        const levels = response.data.levels;
+        setExercises(levels);
         console.log(`📚 Loaded ${response.data.total_exercises} fluency exercises`);
+        console.log('Levels structure:', Object.keys(levels).map(key => `Level ${key}: ${levels[key].exercises?.length || 0} exercises`));
+      } else {
+        console.error('❌ API returned success: false');
+        Alert.alert('Error', 'Failed to load exercises');
       }
     } catch (error) {
-      console.error('Error loading exercises:', error);
+      console.error('❌ Error loading exercises:', error);
+      console.error('Error details:', error.response?.data || error.message);
       Alert.alert('Error', 'Failed to load exercises');
     } finally {
       setIsLoading(false);
@@ -67,22 +80,24 @@ const FluencyTherapyScreen = ({ onBack }) => {
       });
 
       if (response.data.success && response.data.has_progress) {
-        setCurrentLevel(response.data.current_level);
-        setCurrentExercise(response.data.current_exercise);
+        const progressLevel = response.data.current_level;
+        const progressExercise = response.data.current_exercise;
         
-        // Update level progress
+        console.log('✅ Progress loaded - Level:', progressLevel, 'Exercise:', progressExercise);
+        
+        // Set the current level and exercise directly from validated backend response
+        setCurrentLevel(progressLevel);
+        setCurrentExercise(progressExercise);
+        
+        // Update level progress based on backend data
         const newLevelProgress = { 1: false, 2: false, 3: false, 4: false, 5: false };
-        Object.keys(response.data.levels || {}).forEach(levelKey => {
-          const levelNum = parseInt(levelKey);
-          const levelData = response.data.levels[levelKey];
-          const exercises = levelData.exercises || {};
-          const totalExercises = getCurrentLevelExercises(levelNum)?.length || 0;
-          const completedExercises = Object.keys(exercises).length;
-          newLevelProgress[levelNum] = completedExercises >= totalExercises;
-        });
+        if (response.data.level_completion) {
+          Object.keys(response.data.level_completion).forEach(levelKey => {
+            const levelNum = parseInt(levelKey);
+            newLevelProgress[levelNum] = response.data.level_completion[levelKey];
+          });
+        }
         setLevelProgress(newLevelProgress);
-        
-        console.log('✅ Progress loaded - Level:', response.data.current_level, 'Exercise:', response.data.current_exercise);
       }
     } catch (error) {
       console.error('Error loading progress:', error);
@@ -90,11 +105,24 @@ const FluencyTherapyScreen = ({ onBack }) => {
   };
 
   const getCurrentLevelExercises = (level = currentLevel) => {
-    return exercises?.[level]?.exercises || [];
+    if (!exercises || !exercises[level]) {
+      return [];
+    }
+    const levelData = exercises[level];
+    const exerciseArray = levelData.exercises || [];
+    return exerciseArray;
   };
 
   const getCurrentExercise = () => {
     const levelExercises = getCurrentLevelExercises();
+    if (!levelExercises || levelExercises.length === 0) {
+      console.log(`⚠️  No exercises available for level ${currentLevel}`);
+      return null;
+    }
+    if (currentExercise >= levelExercises.length) {
+      console.log(`⚠️  Exercise index ${currentExercise} out of bounds (max: ${levelExercises.length - 1})`);
+      return null;
+    }
     return levelExercises[currentExercise];
   };
 
@@ -285,6 +313,12 @@ const FluencyTherapyScreen = ({ onBack }) => {
       const token = await AsyncStorage.getItem('token');
       const exercise = getCurrentExercise();
 
+      if (!exercise) {
+        Alert.alert('Error', 'Unable to process recording: exercise not found');
+        setIsProcessing(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('audio', {
         uri: uri,
@@ -331,6 +365,11 @@ const FluencyTherapyScreen = ({ onBack }) => {
       const token = await AsyncStorage.getItem('token');
       const exercise = getCurrentExercise();
 
+      if (!exercise) {
+        console.error('❌ Cannot save progress: exercise is null');
+        return;
+      }
+
       const progressData = {
         level: currentLevel,
         exercise_index: currentExercise,
@@ -355,47 +394,35 @@ const FluencyTherapyScreen = ({ onBack }) => {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const levelExercises = getCurrentLevelExercises();
     
+    // Clear current state
+    setAssessmentResult(null);
+    setHasStarted(false);
+    setHasCompletedBreathing(false);
+    setIsBreathing(false);
+    setBreathingPhase('');
+    setRecordingTimer(0);
+    if (recordingInterval) {
+      clearInterval(recordingInterval);
+      setRecordingInterval(null);
+    }
+    
     if (currentExercise < levelExercises.length - 1) {
-      setCurrentExercise(currentExercise + 1);
-      setAssessmentResult(null);
-      setHasStarted(false);
-      setHasCompletedBreathing(false);
-      setIsBreathing(false);
-      setBreathingPhase('');
-      setRecordingTimer(0);
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        setRecordingInterval(null);
-      }
+      // Move to next exercise in current level
+      const nextExercise = currentExercise + 1;
+      setCurrentExercise(nextExercise);
+      console.log(`➡️  Moving to Level ${currentLevel}, Exercise ${nextExercise + 1}/${levelExercises.length}`);
     } else {
-      // Level complete
+      // Level complete - reload progress from server to get correct next position
+      console.log(`✅ Level ${currentLevel} complete! Reloading progress...`);
+      await loadProgress();
+      
       if (currentLevel < 5) {
         Alert.alert(
           'Level Complete!',
-          `Great job! Ready for Level ${currentLevel + 1}?`,
-          [
-            {
-              text: 'Continue',
-              onPress: () => {
-                setCurrentLevel(currentLevel + 1);
-                setCurrentExercise(0);
-                setAssessmentResult(null);
-                setHasStarted(false);
-                setHasCompletedBreathing(false);
-                setIsBreathing(false);
-                setBreathingPhase('');
-                setRecordingTimer(0);
-                if (recordingInterval) {
-                  clearInterval(recordingInterval);
-                  setRecordingInterval(null);
-                }
-                setLevelProgress({ ...levelProgress, [currentLevel]: true });
-              }
-            }
-          ]
+          `Great job! You completed Level ${currentLevel}. Moving to Level ${currentLevel + 1}!`
         );
       } else {
         Alert.alert(
@@ -409,6 +436,12 @@ const FluencyTherapyScreen = ({ onBack }) => {
 
   const playModelAudio = () => {
     const exercise = getCurrentExercise();
+    if (!exercise || !exercise.target) {
+      console.log('⚠️  Cannot play model audio: exercise or target is missing');
+      Alert.alert('Error', 'No exercise available to play');
+      return;
+    }
+    console.log(`🔊 Playing model audio: "${exercise.target}"`);
     Speech.speak(exercise.target, {
       language: 'en-US',
       pitch: 1.0,
@@ -419,6 +452,12 @@ const FluencyTherapyScreen = ({ onBack }) => {
   const startExercise = () => {
     setHasStarted(true);
     const exercise = getCurrentExercise();
+    
+    if (!exercise) {
+      console.error('❌ Cannot start exercise: exercise is null');
+      Alert.alert('Error', 'Unable to load exercise');
+      return;
+    }
     
     if (exercise?.breathing) {
       startBreathing();
@@ -458,6 +497,25 @@ const FluencyTherapyScreen = ({ onBack }) => {
   const exercise = getCurrentExercise();
   const levelInfo = exercises[currentLevel];
   const canProceed = assessmentResult && assessmentResult.fluency_score >= 60;
+
+  // Safety check for exercise
+  if (!exercise) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Fluency Therapy</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Unable to load current exercise</Text>
+          <Text style={styles.errorText}>Level: {currentLevel}, Exercise: {currentExercise}</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -504,12 +562,12 @@ const FluencyTherapyScreen = ({ onBack }) => {
           
           <View style={styles.instructionBox}>
             <Text style={styles.instructionLabel}>Instruction:</Text>
-            <Text style={styles.instructionText}>{exercise?.instruction}</Text>
+            <Text style={styles.instructionText}>{exercise?.instruction || 'No instruction available'}</Text>
           </View>
 
           <View style={styles.targetBox}>
             <Text style={styles.targetLabel}>Say this:</Text>
-            <Text style={styles.targetText}>{exercise?.target}</Text>
+            <Text style={styles.targetText}>{exercise?.target || 'No target available'}</Text>
           </View>
 
           {/* Model Audio Button */}

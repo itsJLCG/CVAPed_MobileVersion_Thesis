@@ -222,7 +222,7 @@ export const therapyAPI = {
     },
     getAllProgress: async () => {
       try {
-        const response = await api.get('/api/fluency-progress/all');
+        const response = await api.get('/fluency/progress/all');
         return response.data;
       } catch (error) {
         throw error.response?.data || error.message;
@@ -282,7 +282,7 @@ export const therapyAPI = {
     },
     getAllProgress: async () => {
       try {
-        const response = await api.get('/api/language-progress/all');
+        const response = await api.get('/expressive/progress/all');
         return response.data;
       } catch (error) {
         throw error.response?.data || error.message;
@@ -342,7 +342,7 @@ export const therapyAPI = {
     },
     getAllProgress: async () => {
       try {
-        const response = await api.get('/api/receptive-progress/all');
+        const response = await api.get('/receptive/progress/all');
         return response.data;
       } catch (error) {
         throw error.response?.data || error.message;
@@ -402,7 +402,7 @@ export const therapyAPI = {
     },
     getAllProgress: async () => {
       try {
-        const response = await api.get('/api/articulation-progress/all');
+        const response = await api.get('/articulation/progress/all');
         return response.data;
       } catch (error) {
         throw error.response?.data || error.message;

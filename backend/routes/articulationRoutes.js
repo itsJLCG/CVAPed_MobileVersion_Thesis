@@ -8,9 +8,160 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const axios = require('axios');
 const ArticulationProgress = require('../models/ArticulationProgress');
+const User = require('../models/User');
+
+/**
+ * GET /api/articulation/progress/all
+ * Get all patients' articulation progress (for therapists)
+ */
+router.get('/progress/all', protect, async (req, res) => {
+  try {
+    console.log('📊 Fetching all articulation progress for therapist');
+    
+    const progressRecords = await ArticulationProgress.aggregate([
+      {
+        $addFields: {
+          userObjectId: { $toObjectId: '$user_id' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userObjectId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          user_id: 1,
+          user_name: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+          user_email: '$user.email',
+          sounds: { $ifNull: ['$sounds', {}] },
+          total_trials: {
+            $size: {
+              $reduce: {
+                input: { $objectToArray: { $ifNull: ['$sounds', {}] } },
+                initialValue: [],
+                in: {
+                  $concatArrays: [
+                    '$$value',
+                    {
+                      $reduce: {
+                        input: { $objectToArray: { $ifNull: ['$$this.v.levels', {}] } },
+                        initialValue: [],
+                        in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          completed_trials: {
+            $size: {
+              $filter: {
+                input: {
+                  $reduce: {
+                    input: { $objectToArray: { $ifNull: ['$sounds', {}] } },
+                    initialValue: [],
+                    in: {
+                      $concatArrays: [
+                        '$$value',
+                        {
+                          $reduce: {
+                            input: { $objectToArray: { $ifNull: ['$$this.v.levels', {}] } },
+                            initialValue: [],
+                            in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                as: 'trial',
+                cond: { $eq: ['$$trial.completed', true] }
+              }
+            }
+          },
+          last_trial_date: {
+            $max: {
+              $map: {
+                input: {
+                  $reduce: {
+                    input: { $objectToArray: { $ifNull: ['$sounds', {}] } },
+                    initialValue: [],
+                    in: {
+                      $concatArrays: [
+                        '$$value',
+                        {
+                          $reduce: {
+                            input: { $objectToArray: { $ifNull: ['$$this.v.levels', {}] } },
+                            initialValue: [],
+                            in: { $concatArrays: ['$$value', { $ifNull: ['$$this.v.trials', []] }] }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                as: 'trial',
+                in: '$$trial.timestamp'
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    // Calculate average scores
+    const progressWithScores = progressRecords.map(record => {
+      const allTrials = Object.values(record.sounds || {}).reduce((acc, sound) => {
+        const soundTrials = Object.values(sound.levels || {}).reduce((trials, level) => {
+          return trials.concat(level.trials || []);
+        }, []);
+        return acc.concat(soundTrials);
+      }, []);
+      
+      const completedTrials = allTrials.filter(t => t.completed && t.score != null);
+      const avgScore = completedTrials.length > 0
+        ? completedTrials.reduce((sum, t) => sum + t.score, 0) / completedTrials.length
+        : 0;
+
+      // Get current level from the highest sound/level combination
+      const sounds = Object.keys(record.sounds || {});
+      const currentLevel = sounds.length > 0 ? 1 : 0;
+
+      return {
+        user_id: record.user_id,
+        user_name: record.user_name,
+        user_email: record.user_email,
+        total_trials: record.total_trials,
+        completed_trials: record.completed_trials,
+        last_trial_date: record.last_trial_date,
+        average_score: avgScore,
+        current_level: currentLevel
+      };
+    });
+
+    console.log(`✅ Found ${progressWithScores.length} articulation progress records`);
+
+    res.json({
+      success: true,
+      progress: progressWithScores
+    });
+  } catch (error) {
+    console.error('❌ Error fetching all articulation progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch progress data'
+    });
+  }
+});
 
 // Base URL for therapy exercises service (Python Flask on port 5002)
-const THERAPY_SERVICE_URL = process.env.THERAPY_URL || 'http://192.168.1.64:5002';
+const THERAPY_SERVICE_URL = process.env.THERAPY_URL || 'http://192.168.1.33:5002';
 
 /**
  * GET /api/articulation/exercises/active/:soundId

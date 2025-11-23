@@ -215,7 +215,7 @@ def get_all_exercises(current_user):
 @token_required
 @therapist_required
 def create_exercise(current_user):
-    """Create a new fluency exercise"""
+    """Create a new fluency exercise with validation"""
     try:
         data = request.get_json()
         
@@ -228,6 +228,46 @@ def create_exercise(current_user):
         level = int(data['level'])
         exercise_type = data['type']
         order = int(data['order'])
+        
+        # Validate level
+        if level < 1 or level > 5:
+            return jsonify({
+                'success': False, 
+                'message': 'Invalid level. Level must be between 1 and 5.'
+            }), 400
+        
+        # Validate order (must be sequential and not skip numbers)
+        existing_exercises_in_level = fluency_exercises_collection.count_documents({
+            'level': level,
+            'is_active': True
+        })
+        
+        # Check if order is valid (should be sequential: 1, 2, 3, etc.)
+        if order < 1:
+            return jsonify({
+                'success': False,
+                'message': 'Order must be a positive number starting from 1.'
+            }), 400
+        
+        # Warn if there's a gap in order numbers
+        if order > existing_exercises_in_level + 1:
+            return jsonify({
+                'success': False,
+                'message': f'Order skips numbers. Level {level} has {existing_exercises_in_level} exercises. Next order should be {existing_exercises_in_level + 1}, but you provided {order}.'
+            }), 400
+        
+        # Check for duplicate order in same level
+        duplicate_order = fluency_exercises_collection.find_one({
+            'level': level,
+            'order': order,
+            'is_active': True
+        })
+        
+        if duplicate_order:
+            return jsonify({
+                'success': False,
+                'message': f'An active exercise with order {order} already exists in level {level}. Please use a different order or deactivate the existing exercise first.'
+            }), 400
         
         # Auto-generate level metadata based on level number
         level_metadata = {
@@ -284,9 +324,40 @@ def create_exercise(current_user):
 @token_required
 @therapist_required
 def update_exercise(current_user, exercise_id):
-    """Update an existing fluency exercise"""
+    """Update an existing fluency exercise with validation"""
     try:
         data = request.get_json()
+        
+        # Get the existing exercise
+        existing_exercise = fluency_exercises_collection.find_one({'_id': ObjectId(exercise_id)})
+        if not existing_exercise:
+            return jsonify({'success': False, 'message': 'Exercise not found'}), 404
+        
+        # If updating level or order, validate
+        if 'level' in data or 'order' in data:
+            new_level = int(data.get('level', existing_exercise['level']))
+            new_order = int(data.get('order', existing_exercise['order']))
+            
+            # Validate level
+            if new_level < 1 or new_level > 5:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid level. Level must be between 1 and 5.'
+                }), 400
+            
+            # Check for duplicate order in same level (excluding current exercise)
+            duplicate_order = fluency_exercises_collection.find_one({
+                'level': new_level,
+                'order': new_order,
+                'is_active': True,
+                '_id': {'$ne': ObjectId(exercise_id)}
+            })
+            
+            if duplicate_order:
+                return jsonify({
+                    'success': False,
+                    'message': f'Another active exercise with order {new_order} already exists in level {new_level}.'
+                }), 400
         
         # Remove _id if present
         if '_id' in data:
@@ -355,6 +426,117 @@ def toggle_active(current_user, exercise_id):
             'success': True,
             'message': f'Exercise is now {"active" if new_status else "inactive"}',
             'is_active': new_status
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@fluency_bp.route('/api/fluency-exercises/validate', methods=['GET'])
+@token_required
+@therapist_required
+def validate_exercises(current_user):
+    """Validate the integrity of fluency exercises database"""
+    try:
+        # Get all active exercises
+        exercises = list(fluency_exercises_collection.find({'is_active': True}).sort([('level', 1), ('order', 1)]))
+        
+        issues = []
+        warnings = []
+        stats = {
+            'total_active': len(exercises),
+            'levels': {}
+        }
+        
+        # Group by level
+        levels = {}
+        for ex in exercises:
+            level = ex['level']
+            if level not in levels:
+                levels[level] = []
+            levels[level].append(ex)
+        
+        # Validate each level
+        for level in range(1, 6):
+            if level not in levels:
+                issues.append({
+                    'severity': 'error',
+                    'level': level,
+                    'message': f'Level {level} has no active exercises. Patient app will fail.'
+                })
+                stats['levels'][level] = {'count': 0, 'status': 'missing'}
+                continue
+            
+            level_exercises = levels[level]
+            stats['levels'][level] = {
+                'count': len(level_exercises),
+                'status': 'ok'
+            }
+            
+            # Check for duplicate orders
+            orders = [ex['order'] for ex in level_exercises]
+            duplicates = [o for o in orders if orders.count(o) > 1]
+            if duplicates:
+                issues.append({
+                    'severity': 'error',
+                    'level': level,
+                    'message': f'Level {level} has duplicate order numbers: {list(set(duplicates))}. This will cause confusion.',
+                    'orders': list(set(duplicates))
+                })
+                stats['levels'][level]['status'] = 'error'
+            
+            # Check for gaps in order sequence
+            sorted_orders = sorted(orders)
+            expected_orders = list(range(1, len(level_exercises) + 1))
+            if sorted_orders != expected_orders:
+                issues.append({
+                    'severity': 'warning',
+                    'level': level,
+                    'message': f'Level {level} has non-sequential orders. Expected {expected_orders}, got {sorted_orders}.',
+                    'expected': expected_orders,
+                    'actual': sorted_orders
+                })
+                if stats['levels'][level]['status'] == 'ok':
+                    stats['levels'][level]['status'] = 'warning'
+            
+            # Check for missing required fields
+            for ex in level_exercises:
+                missing_fields = []
+                required = ['exercise_id', 'type', 'instruction', 'target', 'expected_duration', 'level_name', 'level_color']
+                for field in required:
+                    if field not in ex or not ex[field]:
+                        missing_fields.append(field)
+                
+                if missing_fields:
+                    issues.append({
+                        'severity': 'error',
+                        'level': level,
+                        'exercise_id': ex.get('exercise_id', 'unknown'),
+                        'message': f'Exercise missing required fields: {missing_fields}',
+                        'fields': missing_fields
+                    })
+                    stats['levels'][level]['status'] = 'error'
+            
+            # Warn if level has very few exercises
+            if len(level_exercises) < 2:
+                warnings.append({
+                    'severity': 'warning',
+                    'level': level,
+                    'message': f'Level {level} only has {len(level_exercises)} exercise(s). Consider adding more for better practice.',
+                    'count': len(level_exercises)
+                })
+        
+        # Overall status
+        has_errors = any(i['severity'] == 'error' for i in issues)
+        overall_status = 'error' if has_errors else ('warning' if warnings else 'healthy')
+        
+        return jsonify({
+            'success': True,
+            'status': overall_status,
+            'stats': stats,
+            'issues': issues,
+            'warnings': warnings,
+            'message': f'Validation complete. Status: {overall_status.upper()}'
         }), 200
         
     except Exception as e:

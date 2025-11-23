@@ -1,9 +1,75 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
+const LanguageProgress = require('../models/LanguageProgress');
+const LanguageTrial = require('../models/LanguageTrial');
+const User = require('../models/User');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
+/**
+ * GET /api/expressive/progress/all
+ * Get all patients' expressive language progress (for therapists)
+ */
+router.get('/progress/all', protect, async (req, res) => {
+  try {
+    console.log('📊 Fetching all expressive language progress for therapist');
+    
+    const progressRecords = await LanguageProgress.aggregate([
+      { $match: { mode: 'expressive' } },
+      {
+        $addFields: {
+          userObjectId: { $toObjectId: '$user_id' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userObjectId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          user_id: 1,
+          user_name: { $concat: ['$user.firstName', ' ', '$user.lastName'] },
+          user_email: '$user.email',
+          current_level: 1,
+          total_exercises: 1,
+          completed_exercises: 1,
+          correct_exercises: 1,
+          accuracy: 1,
+          current_exercise: 1,
+          updated_at: 1
+        }
+      }
+    ]);
+
+    const progressWithStats = progressRecords.map(record => ({
+      ...record,
+      total_trials: record.total_exercises || 0,
+      completed_trials: record.completed_exercises || 0,
+      average_score: record.accuracy || 0,
+      last_trial_date: record.updated_at
+    }));
+
+    console.log(`✅ Found ${progressWithStats.length} expressive language progress records`);
+
+    res.json({
+      success: true,
+      progress: progressWithStats
+    });
+  } catch (error) {
+    console.error('❌ Error fetching all expressive language progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch progress data'
+    });
+  }
+});
 
 // Configure multer for audio file uploads
 const upload = multer({

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ScrollView,
   Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TherapyScreen from './TherapyScreen';
@@ -22,6 +23,98 @@ const HomePage = ({ userData, onLogout }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home', 'therapy', 'profile', 'health'
   const scrollViewRef = useRef(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const carouselAnim = useRef(new Animated.Value(0)).current;
+  const card1Anim = useRef(new Animated.Value(0)).current;
+  const card2Anim = useRef(new Animated.Value(0)).current;
+  const card3Anim = useRef(new Animated.Value(0)).current;
+  const card4Anim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Trigger animations on mount
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(carouselAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Stagger card animations
+    Animated.stagger(100, [
+      Animated.spring(card1Anim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card2Anim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card3Anim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(card4Anim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Pulse animation for call-to-action
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // Auto-scroll carousel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveSlide((prevSlide) => {
+        const nextSlide = (prevSlide + 1) % carouselItems.length;
+        scrollViewRef.current?.scrollTo({
+          x: nextSlide * width,
+          animated: true,
+        });
+        return nextSlide;
+      });
+    }, 4000); // Change slide every 4 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Carousel data explaining the system
   const carouselItems = [
@@ -54,11 +147,6 @@ const HomePage = ({ userData, onLogout }) => {
   const handleSearch = () => {
     console.log('Search query:', searchQuery);
     // Implement search functionality later
-  };
-
-  const handleProfilePress = () => {
-    console.log('Profile pressed');
-    // Navigate to profile screen
   };
 
   const handleTabPress = (tab) => {
@@ -99,6 +187,13 @@ const HomePage = ({ userData, onLogout }) => {
     setCurrentScreen('health');
   };
 
+  // Handle manual scroll for carousel
+  const handleScroll = (event) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = Math.floor(event.nativeEvent.contentOffset.x / slideSize);
+    setActiveSlide(index);
+  };
+
   // Show Profile screen if profile tab is active
   if (currentScreen === 'profile') {
     return (
@@ -131,44 +226,68 @@ const HomePage = ({ userData, onLogout }) => {
 
   return (
     <View style={styles.container}>
-      {/* Upper Navbar */}
+      {/* Upper Navbar with Gradient Effect */}
       <View style={styles.topNavbar}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for services..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-          />
-        </View>
-        <TouchableOpacity style={styles.userIconContainer} onPress={handleProfilePress}>
-          <Ionicons name="person-circle" size={40} color="#C9302C" />
-        </TouchableOpacity>
+        <Animated.View 
+          style={[
+            styles.navContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search exercises, progress..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+            />
+          </View>
+        </Animated.View>
       </View>
 
-      {/* Main Content with Carousel */}
+      {/* Main Content */}
       <ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Carousel Section */}
-        <View style={styles.carouselContainer}>
+        {/* Hero Carousel with Animation */}
+        <Animated.View 
+          style={[
+            styles.carouselContainer,
+            {
+              opacity: carouselAnim,
+              transform: [{
+                scale: carouselAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.9, 1],
+                }),
+              }],
+            }
+          ]}
+        >
           <ScrollView
             ref={scrollViewRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             style={styles.carousel}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
-            {carouselItems.map((item) => (
-              <View 
-                key={item.id} 
+            {carouselItems.map((item, index) => (
+              <View
+                key={item.id}
                 style={[styles.carouselItem, { backgroundColor: item.color }]}
               >
-                <Ionicons name={item.icon} size={60} color="#FFFFFF" style={styles.carouselIcon} />
+                <View style={styles.carouselIconContainer}>
+                  <Ionicons name={item.icon} size={70} color="#FFFFFF" />
+                </View>
                 <Text style={styles.carouselText}>{item.title}</Text>
                 <Text style={styles.carouselSubtitle}>{item.subtitle}</Text>
                 <Text style={styles.carouselDescription}>{item.description}</Text>
@@ -179,127 +298,187 @@ const HomePage = ({ userData, onLogout }) => {
           {/* Carousel Indicators */}
           <View style={styles.indicatorContainer}>
             {carouselItems.map((_, index) => (
-              <View key={index} style={styles.indicator} />
+              <View 
+                key={index} 
+                style={[
+                  styles.indicator, 
+                  index === activeSlide && styles.activeIndicator
+                ]} 
+              />
             ))}
           </View>
-        </View>
+        </Animated.View>
 
-        {/* About Section */}
-        <View style={styles.aboutSection}>
-          <View style={styles.aboutHeader}>
-            <Ionicons name="information-circle" size={28} color="#C9302C" />
-            <Text style={styles.aboutTitle}>About CVAPed</Text>
-          </View>
-          <Text style={styles.aboutText}>
-            CVAPed is a mobile-based rehabilitation system designed specifically for pediatric stroke patients. 
-            Our comprehensive platform combines speech therapy exercises, health monitoring, and progress tracking 
-            to support your recovery journey.
-          </Text>
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.featureText}>Interactive Speech Therapy Exercises</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.featureText}>Real-time Progress Monitoring</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.featureText}>Comprehensive Health Logs</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.featureText}>Personalized Rehabilitation Plans</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Additional Content Sections */}
+        {/* Featured Therapy Modules */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Therapy Modules</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Therapy Programs</Text>
+            <TouchableOpacity onPress={handleTherapyCardPress}>
+              <Text style={styles.seeAllText}>See All →</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity 
-              style={[styles.quickActionCard, styles.articulationCard]}
-              onPress={handleTherapyCardPress}
-            >
-              <View style={[styles.cardIconContainer, { backgroundColor: '#FF6B6B' }]}>
-                <Ionicons name="mic" size={32} color="#FFFFFF" />
-              </View>
-              <Text style={styles.quickActionText}>Articulation</Text>
-              <Text style={styles.quickActionSubtext}>Sound production therapy</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ opacity: card1Anim, transform: [{ scale: card1Anim }] }}>
+              <TouchableOpacity 
+                style={[styles.quickActionCard]}
+                onPress={handleTherapyCardPress}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.cardGradient, { backgroundColor: '#FF6B6B' }]}>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>POPULAR</Text>
+                  </View>
+                  <View style={styles.cardIconContainer}>
+                    <Ionicons name="mic" size={36} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.quickActionText}>Articulation</Text>
+                  <Text style={styles.quickActionSubtext}>Sound production</Text>
+                  <View style={styles.cardFooter}>
+                    <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.cardFooterText}>15-20 min</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
             
-            <TouchableOpacity 
-              style={[styles.quickActionCard, styles.fluencyCard]}
-              onPress={handleTherapyCardPress}
-            >
-              <View style={[styles.cardIconContainer, { backgroundColor: '#4ECDC4' }]}>
-                <Ionicons name="chatbubbles" size={32} color="#FFFFFF" />
-              </View>
-              <Text style={styles.quickActionText}>Fluency</Text>
-              <Text style={styles.quickActionSubtext}>Speech flow exercises</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ opacity: card2Anim, transform: [{ scale: card2Anim }] }}>
+              <TouchableOpacity 
+                style={[styles.quickActionCard]}
+                onPress={handleTherapyCardPress}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.cardGradient, { backgroundColor: '#4ECDC4' }]}>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>NEW</Text>
+                  </View>
+                  <View style={styles.cardIconContainer}>
+                    <Ionicons name="chatbubbles" size={36} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.quickActionText}>Language</Text>
+                  <Text style={styles.quickActionSubtext}>Communication skills</Text>
+                  <View style={styles.cardFooter}>
+                    <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.cardFooterText}>10-15 min</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
             
-            <TouchableOpacity 
-              style={[styles.quickActionCard, styles.receptiveCard]}
-              onPress={handleTherapyCardPress}
-            >
-              <View style={[styles.cardIconContainer, { backgroundColor: '#95E1D3' }]}>
-                <Ionicons name="ear" size={32} color="#FFFFFF" />
-              </View>
-              <Text style={styles.quickActionText}>Receptive</Text>
-              <Text style={styles.quickActionSubtext}>Language comprehension</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ opacity: card3Anim, transform: [{ scale: card3Anim }] }}>
+              <TouchableOpacity 
+                style={[styles.quickActionCard]}
+                onPress={handleTherapyCardPress}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.cardGradient, { backgroundColor: '#F4A460' }]}>
+                  <View style={styles.cardIconContainer}>
+                    <Ionicons name="volume-high" size={36} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.quickActionText}>Fluency</Text>
+                  <Text style={styles.quickActionSubtext}>Speech flow</Text>
+                  <View style={styles.cardFooter}>
+                    <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.cardFooterText}>12-18 min</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
             
-            <TouchableOpacity 
-              style={[styles.quickActionCard, styles.expressiveCard]}
-              onPress={handleTherapyCardPress}
-            >
-              <View style={[styles.cardIconContainer, { backgroundColor: '#F38181' }]}>
-                <Ionicons name="chatbox" size={32} color="#FFFFFF" />
-              </View>
-              <Text style={styles.quickActionText}>Expressive</Text>
-              <Text style={styles.quickActionSubtext}>Language expression</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ opacity: card4Anim, transform: [{ scale: card4Anim }] }}>
+              <TouchableOpacity 
+                style={[styles.quickActionCard]}
+                onPress={handleTherapyCardPress}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.cardGradient, { backgroundColor: '#9B59B6' }]}>
+                  <View style={styles.cardIconContainer}>
+                    <Ionicons name="walk" size={36} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.quickActionText}>Physical</Text>
+                  <Text style={styles.quickActionSubtext}>Gait analysis</Text>
+                  <View style={styles.cardFooter}>
+                    <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.cardFooterText}>20-25 min</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </View>
 
-        {/* Health Monitoring Section */}
+        {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Health & Progress</Text>
+          <Text style={styles.sectionTitle}>Quick Access</Text>
           <TouchableOpacity 
             style={styles.healthCard}
             onPress={handleHealthCardPress}
+            activeOpacity={0.8}
           >
-            <View style={styles.healthCardLeft}>
-              <View style={styles.healthIconContainer}>
-                <Ionicons name="heart" size={40} color="#FFFFFF" />
+            <View style={styles.healthCardGradient}>
+              <View style={styles.healthCardLeft}>
+                <View style={styles.healthIconContainer}>
+                  <Ionicons name="heart" size={36} color="#FFFFFF" />
+                </View>
+                <View style={styles.healthInfo}>
+                  <Text style={styles.healthCardTitle}>Health Dashboard</Text>
+                  <Text style={styles.healthCardSubtext}>View all therapy logs & progress</Text>
+                </View>
               </View>
-              <View style={styles.healthInfo}>
-                <Text style={styles.healthCardTitle}>View Health Logs</Text>
-                <Text style={styles.healthCardSubtext}>Track your therapy progress and achievements</Text>
-              </View>
+              <Ionicons name="chevron-forward" size={28} color="#FFFFFF" />
             </View>
-            <Ionicons name="chevron-forward" size={24} color="#C9302C" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Getting Started</Text>
-          <View style={styles.activityCard}>
-            <Ionicons name="rocket" size={48} color="#C9302C" style={styles.activityIcon} />
-            <Text style={styles.activityText}>Ready to begin your journey?</Text>
-            <Text style={styles.activitySubtext}>
-              Start with therapy exercises or check your health logs to track your progress
+        {/* Motivational CTA */}
+        <Animated.View 
+          style={[
+            styles.section,
+            { transform: [{ scale: pulseAnim }] }
+          ]}
+        >
+          <View style={styles.ctaCard}>
+            <View style={styles.ctaIconCircle}>
+              <Ionicons name="rocket" size={40} color="#3498DB" />
+            </View>
+            <Text style={styles.ctaTitle}>Start Your Session! 🎯</Text>
+            <Text style={styles.ctaSubtext}>
+              You're doing amazing! Let's continue building on your progress today.
             </Text>
             <TouchableOpacity 
-              style={styles.startButton}
+              style={styles.ctaButton}
               onPress={handleTherapyCardPress}
+              activeOpacity={0.9}
             >
-              <Text style={styles.startButtonText}>Start Therapy</Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              <Text style={styles.ctaButtonText}>BEGIN THERAPY</Text>
+              <Ionicons name="arrow-forward-circle" size={24} color="#3498DB" />
             </TouchableOpacity>
+            <View style={styles.ctaStats}>
+              <View style={styles.ctaStatItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaStatText}>Personalized</Text>
+              </View>
+              <View style={styles.ctaStatItem}>
+                <Ionicons name="trending-up" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaStatText}>Track Progress</Text>
+              </View>
+              <View style={styles.ctaStatItem}>
+                <Ionicons name="time" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaStatText}>Flexible Time</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Tips Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="bulb" size={24} color="#F39C12" />
+            <Text style={styles.sectionTitle}>Today's Tip</Text>
+          </View>
+          <View style={styles.tipCard}>
+            <Text style={styles.tipText}>
+              💡 <Text style={styles.tipBold}>Pro Tip:</Text> Practice for 15 minutes daily for best results. Consistency is key to improvement!
+            </Text>
           </View>
         </View>
 
@@ -316,77 +495,88 @@ const HomePage = ({ userData, onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
   },
   
-  // Top Navbar Styles
+  // Top Navbar with Gradient
   topNavbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 15,
     paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    elevation: 3,
+    backgroundColor: '#C9302C',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  navContent: {
+    gap: 12,
   },
   searchContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 25,
-    paddingHorizontal: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    marginRight: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
   },
-  userIconContainer: {
-    padding: 5,
-  },
 
-  // Content Styles
+  // Content
   content: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
 
-  // Carousel Styles
+  // Hero Carousel
   carouselContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   carousel: {
-    height: 280,
+    height: 240,
   },
   carouselItem: {
     width: width,
-    height: 280,
+    height: 240,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30,
+    paddingHorizontal: 25,
   },
-  carouselIcon: {
+  carouselIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 15,
-    opacity: 0.9,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   carouselText: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   carouselSubtitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
     opacity: 0.95,
@@ -394,17 +584,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   carouselDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
-    opacity: 0.85,
+    opacity: 0.9,
     textAlign: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
+    lineHeight: 19,
+    marginBottom: 12,
   },
   indicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
   },
   indicator: {
@@ -414,66 +606,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#D0D0D0',
     marginHorizontal: 4,
   },
-
-  // About Section Styles
-  aboutSection: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 15,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  aboutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  aboutTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginLeft: 10,
-  },
-  aboutText: {
-    fontSize: 15,
-    color: '#555',
-    lineHeight: 22,
-    marginBottom: 15,
-    textAlign: 'justify',
-  },
-  featuresList: {
-    marginTop: 10,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  featureText: {
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 10,
-    flex: 1,
+  activeIndicator: {
+    backgroundColor: '#C9302C',
+    width: 24,
   },
 
-  // Section Styles
+  // Section
   section: {
     paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingVertical: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2C3E50',
-    marginBottom: 15,
+    flex: 1,
+  },
+  seeAllText: {
+    fontSize: 13,
+    color: '#C9302C',
+    fontWeight: '600',
   },
 
-  // Quick Actions Styles
+  // Therapy Cards Grid
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -481,70 +643,93 @@ const styles = StyleSheet.create({
   },
   quickActionCard: {
     width: (width - 45) / 2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 15,
-    elevation: 3,
+    marginBottom: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  cardGradient: {
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 180,
+    justifyContent: 'space-between',
+  },
+  cardBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  cardBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   cardIconContainer: {
     width: 60,
     height: 60,
     borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  articulationCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF6B6B',
-  },
-  fluencyCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4ECDC4',
-  },
-  receptiveCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#95E1D3',
-  },
-  expressiveCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#F38181',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   quickActionText: {
-    marginTop: 5,
     fontSize: 16,
-    color: '#333',
+    color: '#FFFFFF',
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: 6,
   },
   quickActionSubtext: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    color: '#FFFFFF',
+    marginTop: 3,
     textAlign: 'center',
+    opacity: 0.9,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    gap: 5,
+  },
+  cardFooterText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
 
-  // Health Card Styles
+  // Health Card
   healthCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  healthCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: '#C9302C',
+    padding: 18,
+    backgroundColor: '#E74C3C',
   },
   healthCardLeft: {
     flexDirection: 'row',
@@ -552,13 +737,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   healthIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#C9302C',
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   healthInfo: {
     flex: 1,
@@ -566,61 +753,117 @@ const styles = StyleSheet.create({
   healthCardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   healthCardSubtext: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 12,
+    color: '#FFFFFF',
+    opacity: 0.9,
   },
 
-  // Activity Styles
-  activityCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 25,
+  // CTA Card
+  ctaCard: {
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
+    backgroundColor: '#3498DB',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  ctaIconCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  ctaTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  ctaSubtext: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.95,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    gap: 8,
+    marginBottom: 16,
+  },
+  ctaButtonText: {
+    color: '#3498DB',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  ctaStats: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 15,
+    flexWrap: 'wrap',
+  },
+  ctaStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  ctaStatText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+
+  // Tip Card
+  tipCard: {
+    backgroundColor: '#FFF9E6',
+    padding: 15,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F39C12',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  activityIcon: {
-    marginBottom: 15,
+  tipText: {
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 18,
   },
-  activityText: {
-    fontSize: 18,
-    color: '#333',
+  tipBold: {
     fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  activitySubtext: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#C9302C',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 25,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  startButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
+    color: '#F39C12',
   },
 
   // Bottom Spacing

@@ -140,9 +140,7 @@ const ProfileScreen = ({ userData, onBack, onLogout }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#2C3E50" />
-        </TouchableOpacity>
+        <View style={styles.headerLeft} />
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerRight}>
           {!isEditing && (
@@ -322,8 +320,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  backButton: {
-    padding: 5,
+  headerLeft: {
+    width: 34,
   },
   headerTitle: {
     fontSize: 20,

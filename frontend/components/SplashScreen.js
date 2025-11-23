@@ -73,15 +73,18 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   logoIcon: {
     width: width * 0.6,
     height: width * 0.6,
     marginBottom: -70,
+    alignSelf: 'center',
   },
   logoText: {
     width: width * 0.75,
     height: 90,
+    alignSelf: 'center',
   },
 });
 

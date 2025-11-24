@@ -15,10 +15,14 @@ const gaitApi = axios.create({
 
 // Add token to requests if available
 gaitApi.interceptors.request.use(
-  (config) => {
-    const token = null; // TODO: Get from AsyncStorage later
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error getting token from AsyncStorage:', error);
     }
     return config;
   },
@@ -47,7 +51,6 @@ export const gaitAnalysisAPI = {
    * @param {Object} data - Sensor data
    * @param {Array} data.accelerometer - Array of {x, y, z, timestamp} readings
    * @param {Array} data.gyroscope - Array of {x, y, z, timestamp} readings
-   * @param {string} data.userId - User ID (optional)
    * @param {string} data.sessionId - Session ID (optional)
    */
   analyzeGait: async (data) => {
@@ -55,8 +58,7 @@ export const gaitAnalysisAPI = {
       const response = await gaitApi.post('/gait/analyze', {
         accelerometer: data.accelerometer,
         gyroscope: data.gyroscope,
-        user_id: data.userId || 'anonymous',  // Backend expects snake_case
-        session_id: data.sessionId || new Date().toISOString(),  // Backend expects snake_case
+        session_id: data.sessionId || `session_${Date.now()}`,
       });
       return response.data;
     } catch (error) {
@@ -86,12 +88,11 @@ export const gaitAnalysisAPI = {
 
   /**
    * Get user's gait analysis history
-   * @param {string} userId - User ID
    * @param {number} limit - Number of records to fetch (default: 10)
    */
-  getUserHistory: async (userId, limit = 10) => {
+  getUserHistory: async (limit = 10) => {
     try {
-      const response = await gaitApi.get(`/gait/history/${userId}`, {
+      const response = await gaitApi.get('/gait/history', {
         params: { limit },
       });
       return response.data;

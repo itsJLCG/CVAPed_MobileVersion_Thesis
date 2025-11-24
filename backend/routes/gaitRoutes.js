@@ -1,6 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const GaitProgress = require('../models/GaitProgress');
+const { protect } = require('../middleware/auth');
 
 // Get Gait Analysis Service URL from environment
 // MUST be configured in .env file - no localhost fallback for production
@@ -34,11 +36,12 @@ router.get('/health', async (req, res) => {
 /**
  * @route   POST /api/gait/analyze
  * @desc    Analyze gait data from accelerometer and gyroscope
- * @access  Private (add auth middleware if needed)
+ * @access  Private
  */
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', protect, async (req, res) => {
   try {
-    const { accelerometer, gyroscope, user_id, session_id } = req.body;
+    const { accelerometer, gyroscope, session_id } = req.body;
+    const user_id = req.user._id; // Get user ID from authenticated user
 
     // Validate required data
     if (!accelerometer && !gyroscope) {
@@ -52,11 +55,31 @@ router.post('/analyze', async (req, res) => {
     const response = await axios.post(`${GAIT_SERVICE_URL}/api/gait/analyze`, {
       accelerometer,
       gyroscope,
-      user_id,
+      user_id: user_id.toString(),
       session_id
     }, {
       timeout: 30000 // 30 second timeout
     });
+
+    // Save analysis results to MongoDB
+    if (response.data.success) {
+      try {
+        const gaitProgress = new GaitProgress({
+          user_id: user_id,
+          session_id: session_id || `session_${Date.now()}`,
+          metrics: response.data.data.metrics,
+          gait_phases: response.data.data.gait_phases,
+          analysis_duration: response.data.data.analysis_duration,
+          data_quality: response.data.data.data_quality
+        });
+
+        await gaitProgress.save();
+        console.log('✓ Gait analysis results saved to database for user:', user_id);
+      } catch (dbError) {
+        console.error('❌ Error saving gait analysis to database:', dbError.message);
+        // Continue even if DB save fails - return analysis results
+      }
+    }
 
     res.json(response.data);
   } catch (error) {
@@ -109,27 +132,27 @@ router.post('/realtime', async (req, res) => {
 });
 
 /**
- * @route   GET /api/gait/history/:userId
- * @desc    Get gait analysis history for a specific user
- * @access  Private (add auth middleware if needed)
+ * @route   GET /api/gait/history
+ * @desc    Get gait analysis history for authenticated user
+ * @access  Private
  */
-router.get('/history/:userId', async (req, res) => {
+router.get('/history', protect, async (req, res) => {
   try {
-    const { userId } = req.params;
-    const limit = req.query.limit || 10;
+    const userId = req.user._id;
+    const limit = parseInt(req.query.limit) || 10;
 
-    // Forward request to Python service
-    const response = await axios.get(
-      `${GAIT_SERVICE_URL}/api/gait/history/${userId}?limit=${limit}`
-    );
+    // Fetch from MongoDB
+    const gaitHistory = await GaitProgress.find({ user_id: userId })
+      .sort({ created_at: -1 })
+      .limit(limit);
 
-    res.json(response.data);
+    res.json({
+      success: true,
+      data: gaitHistory,
+      count: gaitHistory.length
+    });
   } catch (error) {
     console.error('History fetch error:', error.message);
-    
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
     
     res.status(500).json({
       success: false,

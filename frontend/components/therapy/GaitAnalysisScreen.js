@@ -11,7 +11,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Accelerometer, Gyroscope } from 'expo-sensors';
+import { 
+  Accelerometer, 
+  Gyroscope, 
+  Magnetometer,
+  Barometer,
+  DeviceMotion,
+  Pedometer 
+} from 'expo-sensors';
 import gaitAnalysisAPI from '../../services/gaitApi';
 
 const GaitAnalysisScreen = ({ onBack }) => {
@@ -24,7 +31,11 @@ const GaitAnalysisScreen = ({ onBack }) => {
   const [sensorData, setSensorData] = useState({
     accelerometer: [],
     gyroscope: [],
+    magnetometer: [],
+    barometer: [],
+    deviceMotion: [],
   });
+  const [pedometerData, setPedometerData] = useState({ steps: 0, start: null, end: null });
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -33,6 +44,10 @@ const GaitAnalysisScreen = ({ onBack }) => {
   // Sensor subscriptions
   const accelerometerSubscription = useRef(null);
   const gyroscopeSubscription = useRef(null);
+  const magnetometerSubscription = useRef(null);
+  const barometerSubscription = useRef(null);
+  const deviceMotionSubscription = useRef(null);
+  const pedometerSubscription = useRef(null);
   const timerInterval = useRef(null);
 
   // Pulse animation for recording button
@@ -65,9 +80,19 @@ const GaitAnalysisScreen = ({ onBack }) => {
       // Set update intervals (100ms = 10Hz)
       Accelerometer.setUpdateInterval(100);
       Gyroscope.setUpdateInterval(100);
+      Magnetometer.setUpdateInterval(100);
+      Barometer.setUpdateInterval(100);
+      DeviceMotion.setUpdateInterval(100);
 
       // Clear previous data
-      setSensorData({ accelerometer: [], gyroscope: [] });
+      setSensorData({ 
+        accelerometer: [], 
+        gyroscope: [],
+        magnetometer: [],
+        barometer: [],
+        deviceMotion: [],
+      });
+      setPedometerData({ steps: 0, start: Date.now(), end: null });
       setRecordingTime(0);
       setAnalysisResult(null);
 
@@ -105,6 +130,76 @@ const GaitAnalysisScreen = ({ onBack }) => {
         }));
       });
 
+      console.log('Subscribing to magnetometer...');
+      // Subscribe to magnetometer (for orientation/heading)
+      magnetometerSubscription.current = Magnetometer.addListener((data) => {
+        setSensorData((prev) => ({
+          ...prev,
+          magnetometer: [
+            ...prev.magnetometer,
+            {
+              x: data.x,
+              y: data.y,
+              z: data.z,
+              timestamp: Date.now(),
+            },
+          ],
+        }));
+      });
+
+      console.log('Subscribing to barometer...');
+      // Subscribe to barometer (for altitude/elevation changes)
+      try {
+        barometerSubscription.current = Barometer.addListener((data) => {
+          setSensorData((prev) => ({
+            ...prev,
+            barometer: [
+              ...prev.barometer,
+              {
+                pressure: data.pressure,
+                relativeAltitude: data.relativeAltitude,
+                timestamp: Date.now(),
+              },
+            ],
+          }));
+        });
+      } catch (error) {
+        console.log('Barometer not available:', error.message);
+      }
+
+      console.log('Subscribing to device motion...');
+      // Subscribe to device motion (combines accelerometer + gyroscope with filtering)
+      deviceMotionSubscription.current = DeviceMotion.addListener((data) => {
+        setSensorData((prev) => ({
+          ...prev,
+          deviceMotion: [
+            ...prev.deviceMotion,
+            {
+              acceleration: data.acceleration,
+              accelerationIncludingGravity: data.accelerationIncludingGravity,
+              rotation: data.rotation,
+              rotationRate: data.rotationRate,
+              orientation: data.orientation,
+              timestamp: Date.now(),
+            },
+          ],
+        }));
+      });
+
+      console.log('Subscribing to pedometer...');
+      // Subscribe to pedometer (for step counting)
+      try {
+        const start = Date.now();
+        pedometerSubscription.current = Pedometer.watchStepCount((result) => {
+          setPedometerData((prev) => ({
+            ...prev,
+            steps: result.steps,
+          }));
+        });
+      } catch (error) {
+        console.log('Pedometer not available:', error.message);
+      }
+
       // Start timer
       timerInterval.current = setInterval(() => {
         setRecordingTime((prev) => {
@@ -135,6 +230,10 @@ const GaitAnalysisScreen = ({ onBack }) => {
     console.log('=== Stopping Recording ===');
     console.log('Accelerometer samples:', sensorData.accelerometer.length);
     console.log('Gyroscope samples:', sensorData.gyroscope.length);
+    console.log('Magnetometer samples:', sensorData.magnetometer.length);
+    console.log('Barometer samples:', sensorData.barometer.length);
+    console.log('DeviceMotion samples:', sensorData.deviceMotion.length);
+    console.log('Pedometer steps:', pedometerData.steps);
     
     // Unsubscribe from sensors
     if (accelerometerSubscription.current) {
@@ -145,6 +244,25 @@ const GaitAnalysisScreen = ({ onBack }) => {
       gyroscopeSubscription.current.remove();
       gyroscopeSubscription.current = null;
     }
+    if (magnetometerSubscription.current) {
+      magnetometerSubscription.current.remove();
+      magnetometerSubscription.current = null;
+    }
+    if (barometerSubscription.current) {
+      barometerSubscription.current.remove();
+      barometerSubscription.current = null;
+    }
+    if (deviceMotionSubscription.current) {
+      deviceMotionSubscription.current.remove();
+      deviceMotionSubscription.current = null;
+    }
+    if (pedometerSubscription.current) {
+      pedometerSubscription.current.remove();
+      pedometerSubscription.current = null;
+    }
+    
+    // Update pedometer end time
+    setPedometerData((prev) => ({ ...prev, end: Date.now() }));
 
     // Stop timer
     if (timerInterval.current) {
@@ -202,14 +320,25 @@ const GaitAnalysisScreen = ({ onBack }) => {
       const requestData = {
         accelerometer: sensorData.accelerometer,
         gyroscope: sensorData.gyroscope,
-        user_id: 'test-user', // TODO: Get from auth context
-        session_id: `session-${Date.now()}`,
+        magnetometer: sensorData.magnetometer.length > 0 ? sensorData.magnetometer : undefined,
+        barometer: sensorData.barometer.length > 0 ? sensorData.barometer : undefined,
+        deviceMotion: sensorData.deviceMotion.length > 0 ? sensorData.deviceMotion : undefined,
+        pedometer: pedometerData.steps > 0 ? {
+          steps: pedometerData.steps,
+          startTime: pedometerData.start,
+          endTime: pedometerData.end || Date.now()
+        } : undefined,
+        session_id: `session_${Date.now()}`,
       };
 
       console.log('Sending data to backend:', {
         accelerometer_samples: requestData.accelerometer.length,
         gyroscope_samples: requestData.gyroscope.length,
-        user_id: requestData.user_id,
+        magnetometer_samples: requestData.magnetometer?.length || 0,
+        barometer_samples: requestData.barometer?.length || 0,
+        deviceMotion_samples: requestData.deviceMotion?.length || 0,
+        pedometer_steps: requestData.pedometer?.steps || 0,
+        session_id: requestData.session_id,
       });
 
       const result = await gaitAnalysisAPI.analyzeGait(requestData);
@@ -226,9 +355,10 @@ const GaitAnalysisScreen = ({ onBack }) => {
         
         setAnalysisResult(analysisData);
         
+        const stepCount = analysisData.metrics?.step_count || analysisData.stepCount || 0;
         Alert.alert(
           'Analysis Complete',
-          `Found ${analysisData.stepCount || 0} steps!`,
+          `Found ${stepCount} steps!`,
           [{ text: 'View Results' }]
         );
       } else {
@@ -274,6 +404,18 @@ const GaitAnalysisScreen = ({ onBack }) => {
       }
       if (gyroscopeSubscription.current) {
         gyroscopeSubscription.current.remove();
+      }
+      if (magnetometerSubscription.current) {
+        magnetometerSubscription.current.remove();
+      }
+      if (barometerSubscription.current) {
+        barometerSubscription.current.remove();
+      }
+      if (deviceMotionSubscription.current) {
+        deviceMotionSubscription.current.remove();
+      }
+      if (pedometerSubscription.current) {
+        pedometerSubscription.current.remove();
       }
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
@@ -348,9 +490,14 @@ const GaitAnalysisScreen = ({ onBack }) => {
             </Text>
             <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
             {isRecording && (
-              <Text style={styles.dataCount}>
-                {sensorData.accelerometer.length} samples collected
-              </Text>
+              <View>
+                <Text style={styles.dataCount}>
+                  {sensorData.accelerometer.length} samples collected
+                </Text>
+                <Text style={styles.dataCount}>
+                  {pedometerData.steps} steps detected
+                </Text>
+              </View>
             )}
           </View>
 
@@ -583,6 +730,97 @@ const GaitAnalysisScreen = ({ onBack }) => {
                   : "No steps were detected during this recording. Make sure to walk normally while recording for at least 30 seconds."}
               </Text>
             </View>
+
+            {/* Detected Problems Section */}
+            {analysisResult.detected_problems && analysisResult.detected_problems.length > 0 && (
+              <View style={styles.problemsSection}>
+                <View style={styles.problemsHeader}>
+                  <Text style={styles.problemsTitle}>⚠️ Gait Analysis Findings</Text>
+                  <View style={[
+                    styles.riskBadge,
+                    analysisResult.problem_summary?.risk_level === 'high' && styles.riskHigh,
+                    analysisResult.problem_summary?.risk_level === 'moderate' && styles.riskModerate,
+                    analysisResult.problem_summary?.risk_level === 'low_moderate' && styles.riskLow
+                  ]}>
+                    <Text style={styles.riskBadgeText}>
+                      {analysisResult.problem_summary?.risk_level === 'high' ? 'High Priority' :
+                       analysisResult.problem_summary?.risk_level === 'moderate' ? 'Moderate Priority' :
+                       'Low Priority'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.problemsSummary}>
+                  {analysisResult.problem_summary?.summary}
+                </Text>
+
+                {analysisResult.detected_problems.map((problem, index) => (
+                  <View key={index} style={styles.problemCard}>
+                    <View style={styles.problemHeader}>
+                      <Text style={styles.problemCategory}>{problem.category}</Text>
+                      <View style={[
+                        styles.severityBadge,
+                        problem.severity === 'severe' && styles.severityHigh,
+                        problem.severity === 'moderate' && styles.severityModerate,
+                        problem.severity === 'mild' && styles.severityMild
+                      ]}>
+                        <Text style={styles.severityText}>
+                          {problem.severity.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.problemDescription}>{problem.description}</Text>
+                    
+                    <View style={styles.problemMetric}>
+                      <Text style={styles.metricLabel}>Your Value:</Text>
+                      <Text style={styles.metricValue}>{problem.current_value}</Text>
+                      <Text style={styles.metricLabel}>Normal Range:</Text>
+                      <Text style={styles.metricNormal}>{problem.normal_range}</Text>
+                    </View>
+
+                    {problem.percentile && (
+                      <Text style={styles.percentileText}>
+                        You are in the {problem.percentile}th percentile
+                      </Text>
+                    )}
+
+                    <Text style={styles.impactTitle}>Impact:</Text>
+                    <Text style={styles.impactText}>{problem.impact}</Text>
+
+                    <Text style={styles.recommendationsTitle}>Recommended Exercises:</Text>
+                    {problem.recommendations.slice(0, 3).map((rec, idx) => (
+                      <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
+                    ))}
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={styles.exercisePlanButton}
+                  onPress={() => {
+                    Alert.alert(
+                      'Exercise Plan',
+                      'Exercise recommendations will be available soon! Your detected issues have been saved for your therapist to review.',
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                >
+                  <Ionicons name="fitness" size={20} color="#FFFFFF" />
+                  <Text style={styles.exercisePlanButtonText}>View Exercise Plan</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* No Problems Detected */}
+            {analysisResult.detected_problems && analysisResult.detected_problems.length === 0 && (
+              <View style={styles.noProblemCard}>
+                <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+                <Text style={styles.noProblemsTitle}>Great Job!</Text>
+                <Text style={styles.noProblemsText}>
+                  Your gait parameters are within normal ranges. Keep up the good work and maintain regular physical activity!
+                </Text>
+              </View>
+            )}
 
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
@@ -951,6 +1189,192 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 4,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+
+  // Problems Section
+  problemsSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  problemsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  problemsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E65100',
+    flex: 1,
+  },
+  riskBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FFF3E0',
+  },
+  riskHigh: {
+    backgroundColor: '#FFEBEE',
+  },
+  riskModerate: {
+    backgroundColor: '#FFF3E0',
+  },
+  riskLow: {
+    backgroundColor: '#E8F5E9',
+  },
+  riskBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#E65100',
+  },
+  problemsSummary: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  problemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  problemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  problemCategory: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#7F8C8D',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  severityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  severityHigh: {
+    backgroundColor: '#FFEBEE',
+  },
+  severityModerate: {
+    backgroundColor: '#FFF3E0',
+  },
+  severityMild: {
+    backgroundColor: '#E8F5E9',
+  },
+  severityText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+  },
+  problemDescription: {
+    fontSize: 14,
+    color: '#2C3E50',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  problemMetric: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metricNormal: {
+    fontSize: 13,
+    color: '#27AE60',
+    fontWeight: '600',
+  },
+  percentileText: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  impactTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#555',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  impactText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  recommendationsTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#27AE60',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  recommendationItem: {
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 20,
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  exercisePlanButton: {
+    flexDirection: 'row',
+    backgroundColor: '#27AE60',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  exercisePlanButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  noProblemCard: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  noProblemsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#27AE60',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  noProblemsText: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

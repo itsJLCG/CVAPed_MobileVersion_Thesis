@@ -102,19 +102,21 @@ const LanguageTherapyScreen = ({ onBack }) => {
 
               {/* Card Content */}
               <View style={styles.cardContent}>
-                <Text style={styles.areaTitle}>{area.title}</Text>
-                <Text style={[styles.areaSubtitle, { color: area.color }]}>
-                  {area.subtitle}
-                </Text>
+                <View>
+                  <Text style={styles.areaTitle}>{area.title}</Text>
+                  <Text style={[styles.areaSubtitle, { color: area.color }]}>
+                    {area.subtitle}
+                  </Text>
 
-                {/* Skills List */}
-                <View style={styles.skillsList}>
+                  {/* Skills List */}
+                  <View style={styles.skillsList}>
                   {area.skills.map((skill, index) => (
                     <View key={index} style={styles.skillItem}>
                       <Text style={styles.checkmark}>✓</Text>
                       <Text style={styles.skillText}>{skill}</Text>
                     </View>
                   ))}
+                  </View>
                 </View>
 
                 {/* Start Button */}
@@ -178,48 +180,50 @@ const styles = StyleSheet.create({
   // Header Section
   headerSection: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
     backgroundColor: '#F5F5F5',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: '#4A90E2',
   },
   mainTitle: {
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2C3E50',
-    marginBottom: 8,
+    marginBottom: 5,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#7F8C8D',
     textAlign: 'center',
   },
 
   // Areas Container
   areasContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    justifyContent: 'space-around',
   },
 
   // Area Card
   areaCard: {
-    width: width - 60,
-    maxWidth: 350,
+    width: '48%',
+    minWidth: 160,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    marginBottom: 20,
-    paddingVertical: 25,
-    paddingHorizontal: 20,
+    marginBottom: 15,
+    paddingVertical: 20,
+    paddingHorizontal: 15,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
@@ -227,66 +231,68 @@ const styles = StyleSheet.create({
   // Icon Badge
   iconBadgeContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   iconBadge: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconText: {
-    fontSize: 32,
+    fontSize: 28,
   },
 
   // Card Content
   cardContent: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   areaTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#2C3E50',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   areaSubtitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
-    marginBottom: 25,
+    marginBottom: 18,
     textAlign: 'center',
   },
 
   // Skills List
   skillsList: {
     width: '100%',
-    marginBottom: 25,
+    marginBottom: 18,
     alignItems: 'flex-start',
   },
   skillItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingLeft: 10,
+    marginBottom: 8,
+    paddingLeft: 5,
   },
   checkmark: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#27AE60',
-    marginRight: 12,
+    marginRight: 8,
     fontWeight: 'bold',
   },
   skillText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 11,
     color: '#555',
-    lineHeight: 20,
+    lineHeight: 16,
   },
 
   // Exercise Button
   exerciseButton: {
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     flexDirection: 'row',
@@ -294,7 +300,7 @@ const styles = StyleSheet.create({
   },
   exerciseButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },

@@ -463,6 +463,16 @@ export const healthAPI = {
     }
   },
 
+  // Get all health logs (full history)
+  getLogsAll: async () => {
+    try {
+      const response = await api.get('/health/logs?all=true');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get health summary
   getSummary: async () => {
     try {

@@ -121,21 +121,29 @@ const HomePage = ({ userData, onLogout }) => {
     { 
       id: 1, 
       title: 'Welcome to CVAPed', 
-      subtitle: 'Cerebrovascular Accident Pediatric Education',
-      description: 'Your comprehensive stroke rehabilitation companion',
+      subtitle: 'Cerebrovascular Accident & Pediatric Care',
+      description: 'Comprehensive stroke and pediatric rehabilitation platform',
       color: '#C9302C',
       icon: 'heart-circle'
     },
     { 
       id: 2, 
+      title: 'Physical Therapy', 
+      subtitle: 'Stroke Rehabilitation',
+      description: 'Gait analysis and mobility exercises for CVA patients',
+      color: '#9B59B6',
+      icon: 'walk'
+    },
+    { 
+      id: 3, 
       title: 'Speech Therapy', 
-      subtitle: 'Professional Rehabilitation',
-      description: 'Articulation, fluency, and language exercises',
+      subtitle: 'Pediatric Rehabilitation',
+      description: 'Articulation, fluency, and language exercises for children',
       color: '#6B9AC4',
       icon: 'chatbubbles'
     },
     { 
-      id: 3, 
+      id: 4, 
       title: 'Track Progress', 
       subtitle: 'Monitor Your Journey',
       description: 'View detailed health logs and therapy analytics',
@@ -237,16 +245,22 @@ const HomePage = ({ userData, onLogout }) => {
             }
           ]}
         >
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search exercises, progress..."
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-            />
+          {/* Logo Section */}
+          <View style={styles.logoContainer}>
+            <View style={styles.logoIconWrapper}>
+              <Image 
+                source={require('../assets/cvalogonotext.png')} 
+                style={styles.logoIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.logoTextWrapper}>
+              <Image 
+                source={require('../assets/CVAPed_Text.png')} 
+                style={styles.logoText}
+                resizeMode="contain"
+              />
+            </View>
           </View>
         </Animated.View>
       </View>
@@ -326,13 +340,13 @@ const HomePage = ({ userData, onLogout }) => {
               >
                 <View style={[styles.cardGradient, { backgroundColor: '#FF6B6B' }]}>
                   <View style={styles.cardBadge}>
-                    <Text style={styles.cardBadgeText}>POPULAR</Text>
+                    <Text style={styles.cardBadgeText}>PEDIATRIC</Text>
                   </View>
                   <View style={styles.cardIconContainer}>
                     <Ionicons name="mic" size={36} color="#FFFFFF" />
                   </View>
                   <Text style={styles.quickActionText}>Articulation</Text>
-                  <Text style={styles.quickActionSubtext}>Sound production</Text>
+                  <Text style={styles.quickActionSubtext}>Speech therapy for kids</Text>
                   <View style={styles.cardFooter}>
                     <Ionicons name="time-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.cardFooterText}>15-20 min</Text>
@@ -349,13 +363,13 @@ const HomePage = ({ userData, onLogout }) => {
               >
                 <View style={[styles.cardGradient, { backgroundColor: '#4ECDC4' }]}>
                   <View style={styles.cardBadge}>
-                    <Text style={styles.cardBadgeText}>NEW</Text>
+                    <Text style={styles.cardBadgeText}>PEDIATRIC</Text>
                   </View>
                   <View style={styles.cardIconContainer}>
                     <Ionicons name="chatbubbles" size={36} color="#FFFFFF" />
                   </View>
                   <Text style={styles.quickActionText}>Language</Text>
-                  <Text style={styles.quickActionSubtext}>Communication skills</Text>
+                  <Text style={styles.quickActionSubtext}>Pediatric communication</Text>
                   <View style={styles.cardFooter}>
                     <Ionicons name="time-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.cardFooterText}>10-15 min</Text>
@@ -371,11 +385,14 @@ const HomePage = ({ userData, onLogout }) => {
                 activeOpacity={0.8}
               >
                 <View style={[styles.cardGradient, { backgroundColor: '#F4A460' }]}>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>PEDIATRIC</Text>
+                  </View>
                   <View style={styles.cardIconContainer}>
                     <Ionicons name="volume-high" size={36} color="#FFFFFF" />
                   </View>
                   <Text style={styles.quickActionText}>Fluency</Text>
-                  <Text style={styles.quickActionSubtext}>Speech flow</Text>
+                  <Text style={styles.quickActionSubtext}>Pediatric speech flow</Text>
                   <View style={styles.cardFooter}>
                     <Ionicons name="time-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.cardFooterText}>12-18 min</Text>
@@ -391,11 +408,14 @@ const HomePage = ({ userData, onLogout }) => {
                 activeOpacity={0.8}
               >
                 <View style={[styles.cardGradient, { backgroundColor: '#9B59B6' }]}>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>STROKE</Text>
+                  </View>
                   <View style={styles.cardIconContainer}>
                     <Ionicons name="walk" size={36} color="#FFFFFF" />
                   </View>
                   <Text style={styles.quickActionText}>Physical</Text>
-                  <Text style={styles.quickActionSubtext}>Gait analysis</Text>
+                  <Text style={styles.quickActionSubtext}>CVA gait therapy</Text>
                   <View style={styles.cardFooter}>
                     <Ionicons name="time-outline" size={14} color="#FFFFFF" />
                     <Text style={styles.cardFooterText}>20-25 min</Text>
@@ -511,7 +531,46 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   navContent: {
+    paddingVertical: 8,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
+  },
+  logoIconWrapper: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  logoIcon: {
+    width: 150,
+    height: 150,
+  },
+  logoTextWrapper: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  logoText: {
+    width: 140,
+    height: 40,
   },
   searchContainer: {
     flexDirection: 'row',

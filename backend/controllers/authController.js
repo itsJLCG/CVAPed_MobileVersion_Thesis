@@ -113,6 +113,34 @@ exports.register = async (req, res) => {
       console.log('📝 Added child and parent info');
     }
 
+    if (therapyType === 'speech' && patientType === 'myself') {
+      userData.patientInfo = {
+        firstName: firstName,
+        lastName: lastName,
+        gender: patientGender,
+        phone: patientPhone
+      };
+      console.log('📝 Added patient info for myself (speech therapy)');
+    }
+
+    if (therapyType === 'speech' && patientType === 'dependent') {
+      userData.patientInfo = {
+        firstName: patientFirstName,
+        lastName: patientLastName,
+        dateOfBirth: childDateOfBirth,
+        gender: childGender,
+        phone: patientPhone
+      };
+      userData.parentInfo = {
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phone: patientPhone,
+        relationship: relationshipWithChild
+      };
+      console.log('📝 Added dependent patient info and guardian info');
+    }
+
     if (therapyType === 'physical') {
       userData.patientInfo = {
         firstName: patientFirstName,
@@ -120,7 +148,7 @@ exports.register = async (req, res) => {
         gender: patientGender,
         phone: patientPhone
       };
-      console.log('📝 Added patient info');
+      console.log('📝 Added patient info (physical therapy)');
     }
 
     const user = await User.create(userData);
@@ -699,6 +727,34 @@ exports.completeProfile = async (req, res) => {
       console.log('📝 Added child and parent info');
     }
 
+    if (therapyType === 'speech' && patientType === 'myself') {
+      user.patientInfo = {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        gender: patientGender,
+        phone: patientPhone
+      };
+      console.log('📝 Added patient info for myself (speech therapy)');
+    }
+
+    if (therapyType === 'speech' && patientType === 'dependent') {
+      user.patientInfo = {
+        firstName: patientFirstName,
+        lastName: patientLastName,
+        dateOfBirth: childDateOfBirth,
+        gender: childGender,
+        phone: patientPhone
+      };
+      user.parentInfo = {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: patientPhone,
+        relationship: relationshipWithChild
+      };
+      console.log('📝 Added dependent patient info and guardian info');
+    }
+
     if (therapyType === 'physical') {
       user.patientInfo = {
         firstName: patientFirstName,
@@ -706,7 +762,7 @@ exports.completeProfile = async (req, res) => {
         gender: patientGender,
         phone: patientPhone
       };
-      console.log('📝 Added patient info');
+      console.log('📝 Added patient info (physical therapy)');
     }
 
     await user.save();

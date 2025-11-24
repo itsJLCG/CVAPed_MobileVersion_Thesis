@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -1652,7 +1653,11 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="medical" size={22} color="#C9302C" />
+          <Image 
+            source={require('../assets/cvalogonotext.png')} 
+            style={[styles.logoImage, { transform: [{ scale: 3.5 }] }]}
+            resizeMode="contain"
+          />
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>CVAPed Therapist</Text>
             <Text style={styles.headerSubtitle}>Dashboard</Text>
@@ -2655,6 +2660,10 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  logoImage: {
+    width: 50,
+    height: 50,
   },
   headerText: {
     marginLeft: 10,

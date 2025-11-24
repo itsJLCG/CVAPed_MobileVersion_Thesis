@@ -135,7 +135,7 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
     }
     
     if (currentStep === 4) {
-      // For speech therapy with child
+      // Speech therapy - Child
       if (therapyType === 'speech' && patientType === 'child') {
         if (!childFirstName.trim() || !childLastName.trim() || !childDateOfBirth.trim() || !childGender) {
           Alert.alert('Error', 'Please fill in all child information');
@@ -147,7 +147,23 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
         }
       }
       
-      // For physical therapy
+      // Speech therapy - Myself
+      if (therapyType === 'speech' && patientType === 'myself') {
+        if (!patientGender || !patientPhone.trim()) {
+          Alert.alert('Error', 'Please fill in all required fields');
+          return false;
+        }
+      }
+      
+      // Speech therapy - Dependent
+      if (therapyType === 'speech' && patientType === 'dependent') {
+        if (!patientFirstName.trim() || !patientLastName.trim() || !childDateOfBirth.trim() || !childGender || !patientPhone.trim() || !relationshipWithChild.trim()) {
+          Alert.alert('Error', 'Please fill in all required fields');
+          return false;
+        }
+      }
+      
+      // Physical therapy
       if (therapyType === 'physical') {
         if (!patientFirstName.trim() || !patientLastName.trim() || !patientGender) {
           Alert.alert('Error', 'Please fill in all patient information');
@@ -202,6 +218,20 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
         registrationData.parentLastName = parentLastName;
         registrationData.parentEmail = parentEmail;
         registrationData.parentPhone = parentPhone;
+        registrationData.relationshipWithChild = relationshipWithChild;
+      }
+
+      if (therapyType === 'speech' && patientType === 'myself') {
+        registrationData.patientGender = patientGender;
+        registrationData.patientPhone = patientPhone;
+      }
+
+      if (therapyType === 'speech' && patientType === 'dependent') {
+        registrationData.patientFirstName = patientFirstName;
+        registrationData.patientLastName = patientLastName;
+        registrationData.childDateOfBirth = childDateOfBirth;
+        registrationData.childGender = childGender;
+        registrationData.patientPhone = patientPhone;
         registrationData.relationshipWithChild = relationshipWithChild;
       }
 
@@ -461,6 +491,7 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
         );
 
       case 4:
+        // Speech therapy - Child
         if (therapyType === 'speech' && patientType === 'child') {
           return (
             <View style={styles.formContainer}>
@@ -559,6 +590,84 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
           );
         }
 
+        // Speech therapy - Myself or Dependent
+        if (therapyType === 'speech' && (patientType === 'myself' || patientType === 'dependent')) {
+          return (
+            <View style={styles.formContainer}>
+              <Text style={styles.stepTitle}>Patient Information</Text>
+              <Text style={styles.subtitle}>
+                {patientType === 'myself' 
+                  ? 'Please provide additional contact information' 
+                  : 'Please provide patient information'}
+              </Text>
+
+              {patientType === 'dependent' && (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Patient's First Name"
+                    placeholderTextColor="#B0B0B0"
+                    value={patientFirstName}
+                    onChangeText={setPatientFirstName}
+                    autoCapitalize="words"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Patient's Last Name"
+                    placeholderTextColor="#B0B0B0"
+                    value={patientLastName}
+                    onChangeText={setPatientLastName}
+                    autoCapitalize="words"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Date of Birth (MM/DD/YYYY)"
+                    placeholderTextColor="#B0B0B0"
+                    value={childDateOfBirth}
+                    onChangeText={setChildDateOfBirth}
+                  />
+                </>
+              )}
+
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={patientType === 'dependent' ? childGender : patientGender}
+                  onValueChange={patientType === 'dependent' ? setChildGender : setPatientGender}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Gender" value="" />
+                  <Picker.Item label="Male" value="male" />
+                  <Picker.Item label="Female" value="female" />
+                </Picker>
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                placeholderTextColor="#B0B0B0"
+                value={patientPhone}
+                onChangeText={setPatientPhone}
+                keyboardType="phone-pad"
+              />
+
+              {patientType === 'dependent' && (
+                <>
+                  <Text style={[styles.stepTitle, { marginTop: 20 }]}>Your Information (Guardian/Caregiver)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Your Relationship to Patient"
+                    placeholderTextColor="#B0B0B0"
+                    value={relationshipWithChild}
+                    onChangeText={setRelationshipWithChild}
+                    autoCapitalize="words"
+                  />
+                </>
+              )}
+            </View>
+          );
+        }
+
+        // Physical therapy
         if (therapyType === 'physical') {
           return (
             <View style={styles.formContainer}>

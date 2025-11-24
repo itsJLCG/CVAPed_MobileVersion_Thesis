@@ -21,6 +21,8 @@ const HealthScreen = ({ onBack }) => {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     fetchHealthData();
@@ -29,6 +31,7 @@ const HealthScreen = ({ onBack }) => {
   const fetchHealthData = async () => {
     try {
       setError(null);
+      
       const [logsResponse, summaryResponse] = await Promise.all([
         healthAPI.getLogs(),
         healthAPI.getSummary()
@@ -37,9 +40,9 @@ const HealthScreen = ({ onBack }) => {
       if (logsResponse.success) {
         setHealthLogs(logsResponse.data.logs);
         setSummary(logsResponse.data.summary);
+        setHasMore(logsResponse.data.hasMore || false);
       }
     } catch (err) {
-      console.error('Error fetching health data:', err);
       setError(err.message || 'Failed to load health data');
     } finally {
       setLoading(false);
@@ -52,11 +55,25 @@ const HealthScreen = ({ onBack }) => {
     await fetchHealthData();
   };
 
-  const getFilteredLogs = () => {
-    if (selectedFilter === 'all') {
-      return healthLogs;
+  const loadFullHistory = async () => {
+    try {
+      setShowFullHistory(true);
+      const logsResponse = await healthAPI.getLogsAll();
+      if (logsResponse.success) {
+        setHealthLogs(logsResponse.data.logs);
+        setHasMore(false);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load full history');
     }
-    return healthLogs.filter(log => log.type === selectedFilter);
+  };
+
+  const getFilteredLogs = () => {
+    let filtered = healthLogs;
+    if (selectedFilter !== 'all') {
+      filtered = healthLogs.filter(log => log.type === selectedFilter);
+    }
+    return filtered;
   };
 
   const renderLogCard = (log) => {
@@ -113,7 +130,7 @@ const HealthScreen = ({ onBack }) => {
       <View key={log.id} style={styles.logCard}>
         <View style={styles.logHeader}>
           <View style={[styles.typeIcon, { backgroundColor: getTypeColor(log.type) }]}>
-            <Ionicons name={getTypeIcon(log.type)} size={20} color="#FFFFFF" />
+            <Ionicons name={getTypeIcon(log.type)} size={18} color="#FFFFFF" />
           </View>
           <View style={styles.logHeaderText}>
             <Text style={styles.therapyName}>{log.therapyName}</Text>
@@ -124,6 +141,7 @@ const HealthScreen = ({ onBack }) => {
           </View>
         </View>
 
+        {/* Compact details - no heavy containers */}
         <View style={styles.logDetails}>
           {log.type === 'articulation' && (
             <>
@@ -139,12 +157,6 @@ const HealthScreen = ({ onBack }) => {
                 <Ionicons name="repeat" size={16} color="#666" />
                 <Text style={styles.detailText}>Trial #{log.trialNumber}</Text>
               </View>
-              {log.details.transcription && (
-                <View style={styles.transcriptionBox}>
-                  <Text style={styles.transcriptionLabel}>Transcription:</Text>
-                  <Text style={styles.transcriptionText}>{log.details.transcription}</Text>
-                </View>
-              )}
             </>
           )}
 
@@ -243,72 +255,47 @@ const HealthScreen = ({ onBack }) => {
   const renderSummaryCard = () => {
     if (!summary) return null;
 
+    const therapyTypes = [
+      { key: 'articulation', label: 'Articulation', color: '#FF6B6B', icon: 'mic' },
+      { key: 'fluency', label: 'Fluency', color: '#4ECDC4', icon: 'chatbubbles' },
+      { key: 'receptive', label: 'Receptive', color: '#95E1D3', icon: 'ear' },
+      { key: 'expressive', label: 'Expressive', color: '#F38181', icon: 'chatbox' },
+      { key: 'gait', label: 'Physical', color: '#6B9AC4', icon: 'walk' },
+    ];
+
     return (
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Your Progress Summary</Text>
+        <Text style={styles.summaryTitle}>Your Therapy Progress</Text>
         
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{summary.totalSessions}</Text>
-            <Text style={styles.summaryLabel}>Total Sessions</Text>
-          </View>
+        {therapyTypes.map(therapy => {
+          const data = summary[therapy.key];
+          if (!data || data.sessions === 0) return null;
           
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryNumber, { color: '#4CAF50' }]}>
-              {summary.averageScore}%
-            </Text>
-            <Text style={styles.summaryLabel}>Avg Score</Text>
-          </View>
-        </View>
+          return (
+            <View key={therapy.key} style={styles.therapyStatRow}>
+              <View style={styles.therapyStatLeft}>
+                <View style={[styles.therapyStatIcon, { backgroundColor: therapy.color }]}>
+                  <Ionicons name={therapy.icon} size={16} color="#FFFFFF" />
+                </View>
+                <View style={styles.therapyStatInfo}>
+                  <Text style={styles.therapyStatLabel}>{therapy.label}</Text>
+                  <Text style={styles.therapyStatSessions}>{data.sessions} sessions</Text>
+                </View>
+              </View>
+              <View style={styles.therapyStatRight}>
+                <Text style={styles.therapyStatScore}>{data.averageScore}%</Text>
+                <Text style={styles.therapyStatAvg}>avg</Text>
+              </View>
+            </View>
+          );
+        })}
 
-        <View style={styles.therapyBreakdown}>
-          <Text style={styles.breakdownTitle}>Sessions by Type</Text>
-          
-          {summary.articulationSessions > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.breakdownDot, { backgroundColor: '#FF6B6B' }]} />
-              <Text style={styles.breakdownText}>
-                Articulation: {summary.articulationSessions}
-              </Text>
-            </View>
-          )}
-          
-          {summary.fluencySessions > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.breakdownDot, { backgroundColor: '#4ECDC4' }]} />
-              <Text style={styles.breakdownText}>
-                Fluency: {summary.fluencySessions}
-              </Text>
-            </View>
-          )}
-          
-          {summary.receptiveSessions > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.breakdownDot, { backgroundColor: '#95E1D3' }]} />
-              <Text style={styles.breakdownText}>
-                Receptive: {summary.receptiveSessions}
-              </Text>
-            </View>
-          )}
-          
-          {summary.expressiveSessions > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.breakdownDot, { backgroundColor: '#F38181' }]} />
-              <Text style={styles.breakdownText}>
-                Expressive: {summary.expressiveSessions}
-              </Text>
-            </View>
-          )}
-          
-          {summary.gaitSessions > 0 && (
-            <View style={styles.breakdownRow}>
-              <View style={[styles.breakdownDot, { backgroundColor: '#6B9AC4' }]} />
-              <Text style={styles.breakdownText}>
-                Physical Therapy: {summary.gaitSessions}
-              </Text>
-            </View>
-          )}
-        </View>
+        {Object.values(summary).every(v => !v || v.sessions === 0) && (
+          <View style={styles.noDataContainer}>
+            <Ionicons name="information-circle-outline" size={40} color="#CCC" />
+            <Text style={styles.noDataText}>No therapy sessions yet</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -419,7 +406,29 @@ const HealthScreen = ({ onBack }) => {
                 </Text>
               </View>
             ) : (
-              getFilteredLogs().map(log => renderLogCard(log))
+              <>
+                {getFilteredLogs().map(log => renderLogCard(log))}
+                
+                {hasMore && !showFullHistory && (
+                  <TouchableOpacity 
+                    style={styles.viewHistoryButton}
+                    onPress={loadFullHistory}
+                  >
+                    <Ionicons name="time-outline" size={20} color="#C9302C" />
+                    <Text style={styles.viewHistoryText}>View Full History</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {showFullHistory && (
+                  <TouchableOpacity 
+                    style={styles.viewHistoryButton}
+                    onPress={() => { setShowFullHistory(false); fetchHealthData(); }}
+                  >
+                    <Ionicons name="chevron-up" size={20} color="#666" />
+                    <Text style={styles.viewHistoryText}>Show Less</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
 
@@ -500,63 +509,74 @@ const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: '#FFFFFF',
     margin: 15,
-    padding: 20,
+    padding: 15,
     borderRadius: 12,
-    elevation: 3,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3,
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 15,
   },
-  summaryGrid: {
+  therapyStatRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
   },
-  summaryItem: {
+  therapyStatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  therapyStatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  summaryNumber: {
-    fontSize: 32,
+  therapyStatInfo: {
+    marginLeft: 10,
+  },
+  therapyStatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  therapyStatSessions: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
+  },
+  therapyStatRight: {
+    alignItems: 'flex-end',
+  },
+  therapyStatScore: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#C9302C',
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+  therapyStatAvg: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
   },
-  therapyBreakdown: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 15,
-  },
-  breakdownTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 10,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
+  noDataContainer: {
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 20,
   },
-  breakdownDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  breakdownText: {
+  noDataText: {
     fontSize: 14,
-    color: '#333',
+    color: '#999',
+    marginTop: 10,
   },
   filterContainer: {
     marginHorizontal: 15,
@@ -600,82 +620,62 @@ const styles = StyleSheet.create({
   },
   logCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E0E0E0',
   },
   logHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   typeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logHeaderText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
   },
   therapyName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
   },
   logDate: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
-    marginTop: 2,
+    marginTop: 1,
   },
   scoreBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   scoreText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   logDetails: {
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingTop: 12,
+    borderTopColor: '#F5F5F5',
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   detailText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666',
-  },
-  transcriptionBox: {
-    backgroundColor: '#F5F5F5',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  transcriptionLabel: {
+    marginLeft: 6,
     fontSize: 12,
-    fontWeight: 'bold',
     color: '#666',
-    marginBottom: 4,
-  },
-  transcriptionText: {
-    fontSize: 13,
-    color: '#333',
-    fontStyle: 'italic',
   },
   emptyState: {
     alignItems: 'center',
@@ -695,6 +695,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  viewHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  viewHistoryText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#C9302C',
   },
   gaitMetricsGrid: {
     flexDirection: 'row',

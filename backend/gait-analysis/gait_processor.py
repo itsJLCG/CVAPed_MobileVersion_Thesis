@@ -21,9 +21,19 @@ class GaitProcessor:
         self.history = []
         
     def analyze(self, accelerometer: List[Dict], gyroscope: List[Dict], 
-                user_id: str, session_id: str) -> Dict[str, Any]:
+                user_id: str, session_id: str, magnetometer: List[Dict] = None,
+                barometer: List[Dict] = None, deviceMotion: List[Dict] = None,
+                pedometer: Dict = None) -> Dict[str, Any]:
         """
-        Comprehensive gait analysis
+        Comprehensive gait analysis with multi-sensor fusion
+        
+        Args:
+            accelerometer: Raw accelerometer data
+            gyroscope: Raw gyroscope data
+            magnetometer: Magnetometer data for orientation (optional)
+            barometer: Barometer data for elevation changes (optional)
+            deviceMotion: Filtered device motion data (optional)
+            pedometer: Step count from device pedometer (optional)
         
         Returns:
             Dictionary containing:
@@ -34,15 +44,26 @@ class GaitProcessor:
             - stability_score: Balance/stability metric
             - velocity: Walking speed
             - gait_phases: Detected gait cycle phases
+            - heading_variation: Directional changes during walking
+            - elevation_change: Altitude change if available
         """
         
         print(f"\n📊 Starting Gait Analysis Processing:")
         print(f"  Accelerometer samples: {len(accelerometer)}")
         print(f"  Gyroscope samples: {len(gyroscope)}")
+        print(f"  Magnetometer samples: {len(magnetometer) if magnetometer else 0}")
+        print(f"  Barometer samples: {len(barometer) if barometer else 0}")
+        print(f"  DeviceMotion samples: {len(deviceMotion) if deviceMotion else 0}")
+        print(f"  Pedometer steps: {pedometer.get('steps', 0) if pedometer else 0}")
         
         # Convert to numpy arrays
         accel_data = self._convert_to_arrays(accelerometer)
         gyro_data = self._convert_to_arrays(gyroscope)
+        
+        # Process optional sensor data
+        mag_data = self._convert_to_arrays(magnetometer) if magnetometer else None
+        baro_data = self._convert_barometer_data(barometer) if barometer else None
+        motion_data = self._convert_device_motion_data(deviceMotion) if deviceMotion else None
         
         # Calculate actual sampling rate from timestamps
         actual_sampling_rate = self._calculate_sampling_rate(accelerometer)
@@ -81,6 +102,13 @@ class GaitProcessor:
         step_regularity = self._calculate_step_regularity(steps)
         vertical_oscillation = self._calculate_vertical_oscillation(accel_data)
         
+        # Multi-sensor fusion metrics
+        heading_variation = self._calculate_heading_variation(mag_data) if mag_data else 0.0
+        elevation_change = self._calculate_elevation_change(baro_data) if baro_data else 0.0
+        
+        # Use pedometer data if available for validation
+        pedometer_steps = pedometer.get('steps', 0) if pedometer else 0
+        
         # Compile results
         result = {
             'session_id': session_id,
@@ -94,11 +122,22 @@ class GaitProcessor:
                 'gait_symmetry': round(symmetry_score, 2),
                 'stability_score': round(stability_score, 2),
                 'step_regularity': round(step_regularity, 2),
-                'vertical_oscillation': round(vertical_oscillation, 2)
+                'vertical_oscillation': round(vertical_oscillation, 2),
+                'heading_variation': round(heading_variation, 2),
+                'elevation_change': round(elevation_change, 2),
+                'pedometer_steps': pedometer_steps
             },
             'gait_phases': gait_phases,
             'analysis_duration': round(duration, 2),
-            'data_quality': self._assess_data_quality(accelerometer, gyroscope)
+            'data_quality': self._assess_data_quality(accelerometer, gyroscope),
+            'sensors_used': {
+                'accelerometer': True,
+                'gyroscope': True,
+                'magnetometer': mag_data is not None,
+                'barometer': baro_data is not None,
+                'deviceMotion': motion_data is not None,
+                'pedometer': pedometer_steps > 0
+            }
         }
         
         # Store in history
@@ -359,3 +398,58 @@ class GaitProcessor:
         # Keep only last 100 sessions
         if len(self.history) > 100:
             self.history = self.history[-100:]
+    
+    def _convert_barometer_data(self, barometer_data: List[Dict]) -> Dict[str, np.ndarray]:
+        """Convert barometer data to numpy arrays"""
+        if not barometer_data:
+            return {'pressure': np.array([]), 'altitude': np.array([]), 'time': np.array([])}
+        
+        return {
+            'pressure': np.array([d.get('pressure', 0) for d in barometer_data]),
+            'altitude': np.array([d.get('relativeAltitude', 0) for d in barometer_data]),
+            'time': np.array([d.get('timestamp', i) for i, d in enumerate(barometer_data)])
+        }
+    
+    def _convert_device_motion_data(self, motion_data: List[Dict]) -> Dict:
+        """Convert device motion data to structured format"""
+        if not motion_data:
+            return None
+        
+        return {
+            'acceleration': np.array([[d.get('acceleration', {}).get(axis, 0) 
+                                      for axis in ['x', 'y', 'z']] 
+                                     for d in motion_data]),
+            'rotation': np.array([[d.get('rotation', {}).get(axis, 0) 
+                                  for axis in ['alpha', 'beta', 'gamma']] 
+                                 for d in motion_data]),
+            'time': np.array([d.get('timestamp', i) for i, d in enumerate(motion_data)])
+        }
+    
+    def _calculate_heading_variation(self, mag_data: Dict[str, np.ndarray]) -> float:
+        """Calculate variation in heading/orientation during walk"""
+        if mag_data is None or len(mag_data['x']) == 0:
+            return 0.0
+        
+        # Calculate heading from magnetometer data
+        headings = np.arctan2(mag_data['y'], mag_data['x'])
+        
+        # Calculate variation (standard deviation of headings)
+        # Lower variation = straighter walking path
+        heading_std = np.std(headings)
+        
+        # Normalize to 0-1 scale (0 = very straight, 1 = very curved)
+        variation = min(heading_std / np.pi, 1.0)
+        
+        return variation
+    
+    def _calculate_elevation_change(self, baro_data: Dict[str, np.ndarray]) -> float:
+        """Calculate total elevation change from barometer data"""
+        if baro_data is None or len(baro_data['altitude']) < 2:
+            return 0.0
+        
+        # Calculate total elevation change
+        altitude = baro_data['altitude']
+        elevation_change = altitude[-1] - altitude[0]
+        
+        return elevation_change
+

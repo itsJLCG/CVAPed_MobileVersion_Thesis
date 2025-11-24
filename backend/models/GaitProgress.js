@@ -55,7 +55,32 @@ const GaitProgressSchema = new mongoose.Schema({
       type: Number,
       default: 0,
       comment: 'Vertical bounce in meters'
+    },
+    heading_variation: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1,
+      comment: 'Walking path straightness (0 = straight, 1 = curved)'
+    },
+    elevation_change: {
+      type: Number,
+      default: 0,
+      comment: 'Total elevation change in meters'
+    },
+    pedometer_steps: {
+      type: Number,
+      default: 0,
+      comment: 'Steps counted by device pedometer'
     }
+  },
+  sensors_used: {
+    accelerometer: { type: Boolean, default: false },
+    gyroscope: { type: Boolean, default: false },
+    magnetometer: { type: Boolean, default: false },
+    barometer: { type: Boolean, default: false },
+    deviceMotion: { type: Boolean, default: false },
+    pedometer: { type: Boolean, default: false }
   },
   gait_phases: [{
     step_number: Number,
@@ -76,6 +101,23 @@ const GaitProgressSchema = new mongoose.Schema({
     type: String,
     enum: ['poor', 'fair', 'good', 'excellent'],
     default: 'fair'
+  },
+  detected_problems: [{
+    problem: String,
+    severity: {
+      type: String,
+      enum: ['severe', 'moderate', 'mild']
+    },
+    category: String,
+    description: String,
+    recommendations: [String]
+  }],
+  problem_summary: {
+    overall_status: String,
+    risk_level: String,
+    total_problems: Number,
+    severe_count: Number,
+    moderate_count: Number
   },
   created_at: {
     type: Date,

@@ -40,7 +40,15 @@ router.get('/health', async (req, res) => {
  */
 router.post('/analyze', protect, async (req, res) => {
   try {
-    const { accelerometer, gyroscope, session_id } = req.body;
+    const { 
+      accelerometer, 
+      gyroscope, 
+      magnetometer, 
+      barometer, 
+      deviceMotion, 
+      pedometer, 
+      session_id 
+    } = req.body;
     const user_id = req.user._id; // Get user ID from authenticated user
 
     // Validate required data
@@ -51,10 +59,14 @@ router.post('/analyze', protect, async (req, res) => {
       });
     }
 
-    // Forward request to Python service
+    // Forward request to Python service with all sensor data
     const response = await axios.post(`${GAIT_SERVICE_URL}/api/gait/analyze`, {
       accelerometer,
       gyroscope,
+      magnetometer: magnetometer || [],
+      barometer: barometer || [],
+      deviceMotion: deviceMotion || [],
+      pedometer: pedometer || {},
       user_id: user_id.toString(),
       session_id
     }, {
@@ -64,17 +76,52 @@ router.post('/analyze', protect, async (req, res) => {
     // Save analysis results to MongoDB
     if (response.data.success) {
       try {
+        const analysisData = response.data.data;
+        
+        // Detect problems using Python service
+        let problemsData = null;
+        try {
+          const problemsResponse = await axios.post(`${GAIT_SERVICE_URL}/api/gait/detect-problems`, {
+            metrics: analysisData.metrics
+          }, {
+            timeout: 5000
+          });
+          
+          if (problemsResponse.data.success) {
+            problemsData = problemsResponse.data;
+            console.log(`  ✓ Problem detection: ${problemsData.problems_detected} issue(s) found`);
+          }
+        } catch (problemError) {
+          console.error('  ⚠️  Problem detection failed:', problemError.message);
+          // Continue without problem data
+        }
+        
         const gaitProgress = new GaitProgress({
           user_id: user_id,
           session_id: session_id || `session_${Date.now()}`,
-          metrics: response.data.data.metrics,
-          gait_phases: response.data.data.gait_phases,
-          analysis_duration: response.data.data.analysis_duration,
-          data_quality: response.data.data.data_quality
+          metrics: analysisData.metrics,
+          gait_phases: analysisData.gait_phases,
+          analysis_duration: analysisData.analysis_duration,
+          data_quality: analysisData.data_quality,
+          sensors_used: analysisData.sensors_used,
+          detected_problems: problemsData ? problemsData.problems : [],
+          problem_summary: problemsData ? problemsData.summary : null
         });
 
         await gaitProgress.save();
         console.log('✓ Gait analysis results saved to database for user:', user_id);
+        console.log('  Step count:', analysisData.metrics.step_count);
+        console.log('  Sensors used:', JSON.stringify(analysisData.sensors_used));
+        if (problemsData) {
+          console.log('  Problems detected:', problemsData.problems_detected);
+          console.log('  Risk level:', problemsData.summary.risk_level);
+        }
+        
+        // Add problem data to response
+        if (problemsData) {
+          response.data.data.detected_problems = problemsData.problems;
+          response.data.data.problem_summary = problemsData.summary;
+        }
       } catch (dbError) {
         console.error('❌ Error saving gait analysis to database:', dbError.message);
         // Continue even if DB save fails - return analysis results

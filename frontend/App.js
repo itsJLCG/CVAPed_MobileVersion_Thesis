@@ -35,6 +35,13 @@ export default function App() {
       try {
         // Pre-load fonts, make any API calls you need to do here
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if user has seen the landing page before
+        const hasSeenLanding = await AsyncStorage.getItem('hasSeenLanding');
+        if (hasSeenLanding === 'true') {
+          setShowLanding(false);
+          setShowLogin(true);
+        }
       } catch (e) {
         console.warn(e);
       } finally {
@@ -50,7 +57,15 @@ export default function App() {
     setShowSplash(false);
   };
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async () => {
+    try {
+      // Save flag to AsyncStorage so landing page won't show again
+      await AsyncStorage.setItem('hasSeenLanding', 'true');
+      console.log('✅ Landing page flag saved to AsyncStorage');
+    } catch (error) {
+      console.error('❌ Error saving landing page flag:', error);
+    }
+    
     setShowLanding(false);
     setShowLogin(true);
   };
@@ -161,14 +176,25 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     console.log('User logged out');
-    // Clear user data
+    
+    try {
+      // Clear token and user data from AsyncStorage
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      console.log('✅ User session cleared from AsyncStorage');
+    } catch (error) {
+      console.error('❌ Error clearing AsyncStorage:', error);
+    }
+    
+    // Clear user data in state
     setUserData(null);
     setGoogleUserData(null);
-    // Reset to landing page
+    
+    // Reset to login screen (NOT landing page since they've already seen it)
     setShowHome(false);
-    setShowLanding(true);
+    setShowLogin(true);
   };
 
   if (!appIsReady || showSplash) {

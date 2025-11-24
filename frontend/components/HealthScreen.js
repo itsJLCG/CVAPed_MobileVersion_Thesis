@@ -66,6 +66,7 @@ const HealthScreen = ({ onBack }) => {
         case 'fluency': return '#4ECDC4';
         case 'receptive': return '#95E1D3';
         case 'expressive': return '#F38181';
+        case 'gait': return '#6B9AC4';
         default: return '#999';
       }
     };
@@ -76,6 +77,7 @@ const HealthScreen = ({ onBack }) => {
         case 'fluency': return 'chatbubbles';
         case 'receptive': return 'ear';
         case 'expressive': return 'chatbox';
+        case 'gait': return 'walk';
         default: return 'fitness';
       }
     };
@@ -182,6 +184,57 @@ const HealthScreen = ({ onBack }) => {
               </View>
             </>
           )}
+
+          {log.type === 'gait' && (
+            <>
+              <View style={styles.detailRow}>
+                <Ionicons name="footsteps" size={16} color="#666" />
+                <Text style={styles.detailText}>Steps: {log.metrics.stepCount}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="speedometer" size={16} color="#666" />
+                <Text style={styles.detailText}>Cadence: {log.metrics.cadence.toFixed(1)} steps/min</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="resize" size={16} color="#666" />
+                <Text style={styles.detailText}>Stride: {log.metrics.strideLength.toFixed(2)}m</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="trending-up" size={16} color="#666" />
+                <Text style={styles.detailText}>Speed: {log.metrics.velocity.toFixed(2)} m/s</Text>
+              </View>
+              <View style={styles.gaitMetricsGrid}>
+                <View style={styles.gaitMetricItem}>
+                  <Text style={styles.gaitMetricLabel}>Symmetry</Text>
+                  <Text style={styles.gaitMetricValue}>
+                    {(log.metrics.gaitSymmetry * 100).toFixed(0)}%
+                  </Text>
+                </View>
+                <View style={styles.gaitMetricItem}>
+                  <Text style={styles.gaitMetricLabel}>Stability</Text>
+                  <Text style={styles.gaitMetricValue}>
+                    {(log.metrics.stabilityScore * 100).toFixed(0)}%
+                  </Text>
+                </View>
+                <View style={styles.gaitMetricItem}>
+                  <Text style={styles.gaitMetricLabel}>Regularity</Text>
+                  <Text style={styles.gaitMetricValue}>
+                    {(log.metrics.stepRegularity * 100).toFixed(0)}%
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.dataQualityBadge}>
+                <Ionicons 
+                  name={log.dataQuality === 'excellent' || log.dataQuality === 'good' ? 'checkmark-circle' : 'information-circle'} 
+                  size={14} 
+                  color={log.dataQuality === 'excellent' ? '#4CAF50' : log.dataQuality === 'good' ? '#FFC107' : '#999'} 
+                />
+                <Text style={styles.dataQualityText}>
+                  Data Quality: {log.dataQuality}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
     );
@@ -246,6 +299,15 @@ const HealthScreen = ({ onBack }) => {
               </Text>
             </View>
           )}
+          
+          {summary.gaitSessions > 0 && (
+            <View style={styles.breakdownRow}>
+              <View style={[styles.breakdownDot, { backgroundColor: '#6B9AC4' }]} />
+              <Text style={styles.breakdownText}>
+                Physical Therapy: {summary.gaitSessions}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -258,6 +320,7 @@ const HealthScreen = ({ onBack }) => {
       { key: 'fluency', label: 'Fluency', icon: 'chatbubbles' },
       { key: 'receptive', label: 'Receptive', icon: 'ear' },
       { key: 'expressive', label: 'Expressive', icon: 'chatbox' },
+      { key: 'gait', label: 'Physical', icon: 'walk' },
     ];
 
     return (
@@ -297,9 +360,7 @@ const HealthScreen = ({ onBack }) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
+          <View style={styles.headerLeft} />
           <Text style={styles.headerTitle}>Health Logs</Text>
           <View style={styles.headerRight} />
         </View>
@@ -315,9 +376,7 @@ const HealthScreen = ({ onBack }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerLeft} />
         <Text style={styles.headerTitle}>Health Logs</Text>
         <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
           <Ionicons name="refresh" size={24} color="#C9302C" />
@@ -387,8 +446,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  backButton: {
-    padding: 5,
+  headerLeft: {
+    width: 34,
   },
   headerTitle: {
     fontSize: 20,
@@ -636,6 +695,41 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  gaitMetricsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  gaitMetricItem: {
+    alignItems: 'center',
+  },
+  gaitMetricLabel: {
+    fontSize: 11,
+    color: '#999',
+    marginBottom: 4,
+  },
+  gaitMetricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  dataQualityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  dataQualityText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 6,
+    textTransform: 'capitalize',
   },
 });
 

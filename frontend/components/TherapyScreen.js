@@ -115,6 +115,13 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft} />
+        <Text style={styles.headerTitle}>Therapy</Text>
+        <View style={styles.headerRight} />
+      </View>
+
       {/* Content */}
       <ScrollView 
         style={styles.content}
@@ -280,6 +287,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+
+  // Header Styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  headerLeft: {
+    width: 34,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  headerRight: {
+    width: 34,
   },
 
   // Content Styles

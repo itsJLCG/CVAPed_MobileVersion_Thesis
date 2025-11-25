@@ -24,6 +24,7 @@ connectDB().then(db => {
 // Route files (loaded after app is created)
 const authRoutes = require('./routes/authRoutes');
 const gaitRoutes = require('./routes/gaitRoutes');
+const exerciseRoutes = require('./routes/exerciseRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const articulationAssessmentRoutes = require('./routes/articulationAssessment');
 const articulationRoutes = require('./routes/articulationRoutes');
@@ -36,6 +37,7 @@ const healthRoutes = require('./routes/healthRoutes');
 // Mount routers
 app.use('/api/auth', authRoutes);
 app.use('/api/gait', gaitRoutes);
+app.use('/api/exercises', exerciseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);  // Health logs and summary
 app.use('/api/articulation', articulationRoutes);  // Progress & exercises

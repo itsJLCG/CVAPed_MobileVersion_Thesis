@@ -9,6 +9,7 @@ import {
   Animated,
   Alert,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -21,7 +22,7 @@ import {
 } from 'expo-sensors';
 import gaitAnalysisAPI from '../../services/gaitApi';
 
-const GaitAnalysisScreen = ({ onBack }) => {
+const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -352,6 +353,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
         const analysisData = result.data || result.analysis || result;
         
         console.log('Analysis data:', analysisData);
+        console.log('Exercise plan ID:', analysisData.exercise_plan_id);
         
         setAnalysisResult(analysisData);
         
@@ -370,6 +372,69 @@ const GaitAnalysisScreen = ({ onBack }) => {
       console.error('Error message:', error.message);
       console.error('Error response:', error.response?.data);
       
+      // Handle validation errors (400) - these are user-facing, not system errors
+      if (error.response?.status === 400 && error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Check if this is a validation error (minimum requirements not met)
+        if (errorData.valid === false && errorData.validation) {
+          const { duration, steps } = errorData.validation;
+          
+          let message = errorData.message || 'Gait analysis requirements not met';
+          message += '\n\n';
+          
+          if (!duration.passed) {
+            message += `⏱️ Duration: ${duration.value.toFixed(1)}s / ${duration.required}s required\n`;
+          }
+          if (!steps.passed) {
+            message += `👣 Steps: ${steps.value} / ${steps.required} required\n`;
+          }
+          
+          message += '\n' + (errorData.recommendation || 'Please try again with a longer walk.');
+          
+          setAnalysisResult({
+            stepCount: steps.value || 0,
+            cadence: 0,
+            walkingSpeed: 0,
+            symmetryIndex: 0,
+            stabilityScore: 0,
+            stepLength: 0,
+            error: message,
+            isValidationError: true,
+          });
+          
+          Alert.alert(
+            '⚠️ Analysis Requirements Not Met',
+            message,
+            [
+              { 
+                text: 'Try Again', 
+                onPress: () => setAnalysisResult(null),
+                style: 'default'
+              }
+            ]
+          );
+          return;
+        }
+        
+        // Check if user needs to complete exercises first (403)
+        if (errorData.allowed === false) {
+          const message = errorData.message || 'Please complete today\'s exercises first';
+          const details = errorData.exercises_remaining 
+            ? `\n\nExercises remaining: ${errorData.exercises_remaining}`
+            : '';
+          
+          setAnalysisResult({
+            isValidationError: true,
+            is403Error: true,
+            error: message + details
+          });
+          
+          return;
+        }
+      }
+      
+      // Handle other errors
       setAnalysisResult({
         stepCount: 0,
         cadence: 0,
@@ -382,7 +447,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
       
       Alert.alert(
         'Analysis Error',
-        `Failed to analyze: ${error.message}\n\nCheck console for details.`
+        `Failed to analyze: ${error.message}\n\nPlease try again.`
       );
     } finally {
       setIsAnalyzing(false);
@@ -424,11 +489,11 @@ const GaitAnalysisScreen = ({ onBack }) => {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Gait Analysis</Text>
         <View style={styles.placeholder} />
@@ -442,8 +507,10 @@ const GaitAnalysisScreen = ({ onBack }) => {
         {/* Instructions Card */}
         {!analysisResult && (
           <View style={styles.instructionsCard}>
-            <Ionicons name="information-circle" size={30} color="#C9302C" />
-            <Text style={styles.instructionsTitle}>How to Perform Gait Analysis</Text>
+            <View style={{alignItems: 'center'}}>
+              <Ionicons name="information-circle" size={40} color="#C9302C" />
+              <Text style={styles.instructionsTitle}>How to Perform Gait Analysis</Text>
+            </View>
             <View style={styles.stepsList}>
               <View style={styles.stepItem}>
                 <View style={styles.stepNumber}>
@@ -494,9 +561,6 @@ const GaitAnalysisScreen = ({ onBack }) => {
                 <Text style={styles.dataCount}>
                   {sensorData.accelerometer.length} samples collected
                 </Text>
-                <Text style={styles.dataCount}>
-                  {pedometerData.steps} steps detected
-                </Text>
               </View>
             )}
           </View>
@@ -539,30 +603,77 @@ const GaitAnalysisScreen = ({ onBack }) => {
         {/* Analysis Results */}
         {analysisResult && !isAnalyzing && (
           <View style={styles.resultsContainer}>
-            <View style={styles.resultsHeader}>
-              <Ionicons name="checkmark-circle" size={40} color="#27AE60" />
-              <Text style={styles.resultsTitle}>Analysis Complete!</Text>
-              <Text style={styles.dataQuality}>
-                Data Quality: {analysisResult.data_quality || 'good'}
-              </Text>
-            </View>
-
-            {/* Show error if present */}
-            {analysisResult.error && (
-              <View style={styles.errorCard}>
-                <Ionicons name="warning" size={24} color="#FF9800" />
-                <Text style={styles.errorText}>
+            {/* Show validation error prominently */}
+            {analysisResult.isValidationError ? (
+              <View style={styles.validationErrorContainer}>
+                <Ionicons 
+                  name={analysisResult.is403Error ? "lock-closed" : "alert-circle"} 
+                  size={60} 
+                  color={analysisResult.is403Error ? "#DC2626" : "#FF9800"} 
+                />
+                <Text style={styles.validationErrorTitle}>
+                  {analysisResult.is403Error ? '🔒 Complete Exercises First' : 'Requirements Not Met'}
+                </Text>
+                <Text style={styles.validationErrorMessage}>
                   {analysisResult.error}
                 </Text>
+                
+                {analysisResult.is403Error && onNavigateToExercisePlan && (
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: '#0066CC', marginBottom: 12 }]}
+                    onPress={async () => {
+                      try {
+                        const response = await exerciseApi.getTodaysPlan();
+                        if (response.success && response.plan) {
+                          onNavigateToExercisePlan(response.plan._id);
+                        } else {
+                          Alert.alert('No Plan', 'No exercise plan found.');
+                        }
+                      } catch (err) {
+                        console.error('Error loading plan:', err);
+                        Alert.alert('Error', 'Failed to load exercise plan');
+                      }
+                    }}
+                  >
+                    <Ionicons name="fitness" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.retryButtonText}>View My Exercises</Text>
+                  </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => setAnalysisResult(null)}
+                >
+                  <Ionicons name="refresh" size={24} color="#FFFFFF" />
+                  <Text style={styles.retryButtonText}>{analysisResult.is403Error ? 'Got It' : 'Try Again'}</Text>
+                </TouchableOpacity>
               </View>
-            )}
+            ) : (
+              <>
+                <View style={styles.resultsHeader}>
+                  <Ionicons name="checkmark-circle" size={40} color="#27AE60" />
+                  <Text style={styles.resultsTitle}>Analysis Complete!</Text>
+                  <Text style={styles.dataQuality}>
+                    Data Quality: {analysisResult.data_quality || 'good'}
+                  </Text>
+                </View>
+
+                {/* Show error if present */}
+                {analysisResult.error && (
+                  <View style={styles.errorCard}>
+                    <Ionicons name="warning" size={24} color="#FF9800" />
+                    <Text style={styles.errorText}>
+                      {analysisResult.error}
+                    </Text>
+                  </View>
+                )}
 
             {/* Metrics Grid - Updated to match backend response */}
             <View style={styles.metricsGrid}>
               {/* Step Count */}
               <View style={styles.metricCardFull}>
                 <View style={styles.metricHeader}>
-                  <Ionicons name="footsteps" size={30} color="#C9302C" />
+                  <Ionicons name="footsteps" size={24} color="#C9302C" />
                   <View style={styles.metricInfo}>
                     <Text style={styles.metricValue}>
                       {analysisResult.metrics?.step_count || 0}
@@ -583,7 +694,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Cadence */}
               <View style={styles.metricCard}>
-                <Ionicons name="speedometer" size={28} color="#3498DB" />
+                <Ionicons name="speedometer" size={22} color="#3498DB" />
                 <Text style={styles.metricValue}>
                   {analysisResult.metrics?.cadence?.toFixed(1) || '0'}
                 </Text>
@@ -601,7 +712,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Walking Speed */}
               <View style={styles.metricCard}>
-                <Ionicons name="walk" size={28} color="#9B59B6" />
+                <Ionicons name="walk" size={22} color="#9B59B6" />
                 <Text style={styles.metricValue}>
                   {analysisResult.metrics?.velocity?.toFixed(2) || '0'}
                 </Text>
@@ -619,7 +730,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Gait Symmetry */}
               <View style={styles.metricCard}>
-                <Ionicons name="git-compare" size={28} color="#E67E22" />
+                <Ionicons name="git-compare" size={22} color="#E67E22" />
                 <Text style={styles.metricValue}>
                   {((analysisResult.metrics?.gait_symmetry || 0) * 100).toFixed(0)}%
                 </Text>
@@ -637,7 +748,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Stability Score */}
               <View style={styles.metricCard}>
-                <Ionicons name="shield-checkmark" size={28} color="#27AE60" />
+                <Ionicons name="shield-checkmark" size={22} color="#27AE60" />
                 <Text style={styles.metricValue}>
                   {((analysisResult.metrics?.stability_score || 0) * 100).toFixed(0)}%
                 </Text>
@@ -655,7 +766,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Stride Length */}
               <View style={styles.metricCard}>
-                <Ionicons name="resize" size={28} color="#E74C3C" />
+                <Ionicons name="resize" size={22} color="#E74C3C" />
                 <Text style={styles.metricValue}>
                   {analysisResult.metrics?.stride_length?.toFixed(2) || '0'}
                 </Text>
@@ -673,7 +784,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Step Regularity */}
               <View style={styles.metricCard}>
-                <Ionicons name="pulse" size={28} color="#16A085" />
+                <Ionicons name="pulse" size={22} color="#16A085" />
                 <Text style={styles.metricValue}>
                   {((analysisResult.metrics?.step_regularity || 0) * 100).toFixed(0)}%
                 </Text>
@@ -691,7 +802,7 @@ const GaitAnalysisScreen = ({ onBack }) => {
 
               {/* Vertical Oscillation */}
               <View style={styles.metricCard}>
-                <Ionicons name="trending-up" size={28} color="#8E44AD" />
+                <Ionicons name="trending-up" size={22} color="#8E44AD" />
                 <Text style={styles.metricValue}>
                   {(analysisResult.metrics?.vertical_oscillation * 100)?.toFixed(1) || '0'}
                 </Text>
@@ -798,11 +909,21 @@ const GaitAnalysisScreen = ({ onBack }) => {
                 <TouchableOpacity
                   style={styles.exercisePlanButton}
                   onPress={() => {
-                    Alert.alert(
-                      'Exercise Plan',
-                      'Exercise recommendations will be available soon! Your detected issues have been saved for your therapist to review.',
-                      [{ text: 'OK' }]
-                    );
+                    if (onNavigateToExercisePlan && analysisResult?.exercise_plan_id) {
+                      onNavigateToExercisePlan(analysisResult.exercise_plan_id);
+                    } else if (onNavigateToExercisePlan) {
+                      Alert.alert(
+                        'No Exercise Plan',
+                        'Exercise recommendations are being generated. Please try again in a moment.',
+                        [{ text: 'OK' }]
+                      );
+                    } else {
+                      Alert.alert(
+                        'Exercise Plan',
+                        'Exercise recommendations will be available soon!',
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                 >
                   <Ionicons name="fitness" size={20} color="#FFFFFF" />
@@ -849,10 +970,12 @@ const GaitAnalysisScreen = ({ onBack }) => {
                 </Text>
               </TouchableOpacity>
             </View>
+            </>
+            )}
           </View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -867,22 +990,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#C9302C',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   backButton: {
-    padding: 5,
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   placeholder: {
     width: 34,
@@ -899,22 +1022,24 @@ const styles = StyleSheet.create({
   // Instructions Card
   instructionsCard: {
     backgroundColor: '#FFFFFF',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    elevation: 2,
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#C9302C',
   },
   instructionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginTop: 10,
-    marginBottom: 15,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 12,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   stepsList: {
     width: '100%',
@@ -922,75 +1047,90 @@ const styles = StyleSheet.create({
   stepItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 16,
+    paddingVertical: 8,
   },
   stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#C9302C',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   stepNumberText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   stepText: {
     flex: 1,
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 20,
-    paddingTop: 4,
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+    paddingTop: 6,
   },
 
   // Recording Section
   recordingSection: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingVertical: 40,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   timerContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 40,
+    paddingHorizontal: 20,
   },
   timerLabel: {
     fontSize: 16,
-    color: '#7F8C8D',
-    marginBottom: 10,
+    color: '#6B7280',
+    marginBottom: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   timerText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2C3E50',
+    fontSize: 56,
+    fontWeight: '700',
+    color: '#C9302C',
     fontVariant: ['tabular-nums'],
   },
   dataCount: {
-    fontSize: 12,
-    color: '#95A5A6',
-    marginTop: 5,
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 8,
+    fontWeight: '500',
   },
   recordButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: '#C9302C',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
     shadowColor: '#C9302C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
   },
   recordButtonActive: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: '#DC2626',
   },
   recordButtonLabel: {
-    marginTop: 20,
+    marginTop: 24,
     fontSize: 16,
-    color: '#7F8C8D',
+    color: '#374151',
     fontWeight: '600',
   },
 
@@ -1013,23 +1153,32 @@ const styles = StyleSheet.create({
 
   // Results
   resultsContainer: {
-    margin: 20,
+    margin: 16,
   },
   resultsHeader: {
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   resultsTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#27AE60',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#10B981',
     marginTop: 10,
   },
   dataQuality: {
-    fontSize: 14,
-    color: '#7F8C8D',
-    marginTop: 5,
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 6,
     textTransform: 'capitalize',
+    fontWeight: '500',
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -1041,113 +1190,126 @@ const styles = StyleSheet.create({
     width: '48%',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
-    marginBottom: 15,
-    elevation: 3,
+    marginBottom: 12,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   metricCardFull: {
     width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 18,
-    marginBottom: 15,
-    elevation: 3,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   metricHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   metricInfo: {
-    marginLeft: 15,
+    marginLeft: 12,
     flex: 1,
   },
   metricValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginTop: 8,
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 6,
   },
   metricLabel: {
-    fontSize: 13,
-    color: '#7F8C8D',
+    fontSize: 12,
+    color: '#6B7280',
     marginTop: 4,
     textAlign: 'center',
+    fontWeight: '600',
   },
   metricSubtext: {
     fontSize: 11,
-    color: '#95A5A6',
-    marginTop: 6,
+    color: '#9CA3AF',
+    marginTop: 4,
     textAlign: 'center',
-    fontStyle: 'italic',
+    fontWeight: '500',
   },
   metricExplanation: {
     fontSize: 13,
-    color: '#555',
+    color: '#374151',
     lineHeight: 18,
-    textAlign: 'left',
+    textAlign: 'justify',
   },
   
   // Summary Card
   summaryCard: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 18,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#27AE60',
+    borderLeftColor: '#C9302C',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   summaryTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#27AE60',
+    fontWeight: '700',
+    color: '#C9302C',
     marginBottom: 10,
   },
   summaryText: {
     fontSize: 14,
-    color: '#2C3E50',
+    color: '#374151',
     lineHeight: 22,
+    textAlign: 'justify',
   },
 
   // Action Buttons
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 15,
+    gap: 10,
+    marginTop: 12,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     backgroundColor: '#C9302C',
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    gap: 6,
+    elevation: 3,
+    shadowColor: '#C9302C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
   },
   secondaryButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#C9302C',
+    elevation: 1,
   },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   secondaryButtonText: {
     color: '#C9302C',
@@ -1193,19 +1355,30 @@ const styles = StyleSheet.create({
 
   // Problems Section
   problemsSection: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   problemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#F3F4F6',
   },
   problemsTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#E65100',
+    fontWeight: '700',
+    color: '#DC2626',
     flex: 1,
   },
   riskBadge: {
@@ -1230,35 +1403,33 @@ const styles = StyleSheet.create({
   },
   problemsSummary: {
     fontSize: 14,
-    color: '#555',
-    marginBottom: 15,
-    lineHeight: 20,
+    color: '#4B5563',
+    marginBottom: 14,
+    lineHeight: 22,
+    textAlign: 'justify',
   },
   problemCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 15,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   problemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   problemCategory: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#7F8C8D',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   severityBadge: {
     paddingHorizontal: 10,
@@ -1266,92 +1437,97 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   severityHigh: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: '#FEE2E2',
   },
   severityModerate: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#FED7AA',
   },
   severityMild: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#D1FAE5',
   },
   severityText: {
     fontSize: 10,
-    fontWeight: 'bold',
-    color: '#D32F2F',
+    fontWeight: '700',
+    color: '#DC2626',
   },
   problemDescription: {
     fontSize: 14,
-    color: '#2C3E50',
-    marginBottom: 12,
+    color: '#1F2937',
+    marginBottom: 10,
     lineHeight: 20,
+    fontWeight: '500',
+    textAlign: 'justify',
   },
   problemMetric: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
     padding: 10,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 8,
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   metricNormal: {
     fontSize: 13,
-    color: '#27AE60',
+    color: '#10B981',
     fontWeight: '600',
   },
   percentileText: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: '#6B7280',
     fontStyle: 'italic',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   impactTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: '#555',
+    fontWeight: '700',
+    color: '#374151',
     marginTop: 8,
     marginBottom: 4,
   },
   impactText: {
     fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-    marginBottom: 12,
+    color: '#4B5563',
+    lineHeight: 20,
+    marginBottom: 8,
+    textAlign: 'justify',
   },
   recommendationsTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: '#27AE60',
+    fontWeight: '700',
+    color: '#C9302C',
     marginTop: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   recommendationItem: {
     fontSize: 13,
-    color: '#555',
+    color: '#374151',
     lineHeight: 20,
     marginBottom: 4,
-    paddingLeft: 8,
+    paddingLeft: 6,
   },
   exercisePlanButton: {
     flexDirection: 'row',
-    backgroundColor: '#27AE60',
-    paddingVertical: 15,
+    backgroundColor: '#C9302C',
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    marginTop: 12,
+    elevation: 3,
+    shadowColor: '#C9302C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   exercisePlanButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   noProblemCard: {
     backgroundColor: '#E8F5E9',
@@ -1375,6 +1551,52 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  
+  // Validation Error Styles
+  validationErrorContainer: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    marginVertical: 20,
+    borderWidth: 2,
+    borderColor: '#FF9800',
+  },
+  validationErrorTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#E65100',
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  validationErrorMessage: {
+    fontSize: 15,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    backgroundColor: '#FF9800',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

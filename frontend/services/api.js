@@ -484,11 +484,106 @@ export const healthAPI = {
   },
 };
 
+// Gait Exercise API endpoints
+export const exerciseApi = {
+  // Check if user can perform gait analysis today
+  canAnalyze: async (userId) => {
+    try {
+      const response = await api.get(`/exercises/can-analyze/${userId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get today's exercise plan
+  getTodaysPlan: async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userStr = await AsyncStorage.getItem('userData');
+      const userData = JSON.parse(userStr);
+      const userId = userData.user?._id || userData._id;
+      
+      const response = await api.get(`/exercises/today/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get specific exercise plan by ID
+  getPlanById: async (planId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      
+      const response = await api.get(`/exercises/plan/${planId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Mark single exercise as complete
+  markExerciseComplete: async (planId, exerciseId, difficultyRating, notes) => {
+    try {
+      const response = await api.post(`/exercises/complete/${planId}/${exerciseId}`, {
+        difficulty_rating: difficultyRating,
+        notes: notes
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Mark all exercises as complete (demo mode)
+  markAllExercisesComplete: async (planId) => {
+    try {
+      const response = await api.post(`/exercises/complete-all/${planId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Undo exercise completion
+  undoExerciseComplete: async (planId, exerciseId) => {
+    try {
+      const response = await api.post(`/exercises/undo/${planId}/${exerciseId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get exercise history
+  getHistory: async (days = 30) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userStr = await AsyncStorage.getItem('userData');
+      const userData = JSON.parse(userStr);
+      const userId = userData.user?._id || userData._id;
+      
+      const response = await api.get(`/exercises/history/${userId}?days=${days}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+};
+
 export default {
   ...api,
   baseURL: THERAPY_API_URL, // Export base URL for manual fetch calls
   therapyAPI,
   adminAPI,
   authAPI,
-  healthAPI
+  healthAPI,
+  exerciseApi
 };

@@ -10,7 +10,11 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import GaitAnalysisScreen from './GaitAnalysisScreen';
+import ExercisePlanScreen from './ExercisePlanScreen';
+import ExerciseChecklistScreen from './ExerciseChecklistScreen';
+import { exerciseApi } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +23,9 @@ const PhysicalTherapyScreen = ({ onBack }) => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [showGaitAnalysis, setShowGaitAnalysis] = useState(false);
+  const [showExercisePlan, setShowExercisePlan] = useState(false);
+  const [showExerciseChecklist, setShowExerciseChecklist] = useState(false);
+  const [exercisePlanId, setExercisePlanId] = useState(null);
 
   useEffect(() => {
     // Fade in and slide up animation for header
@@ -36,8 +43,61 @@ const PhysicalTherapyScreen = ({ onBack }) => {
     ]).start();
   }, []);
 
-  const handleMobileDevice = () => {
-    // Navigate to mobile device gait analysis
+  const handleMobileDevice = async () => {
+    try {
+      console.log('=== Checking if user can perform gait analysis ===');
+      
+      // Check if user has incomplete exercises
+      const userStr = await AsyncStorage.getItem('userData');
+      if (!userStr) {
+        console.log('❌ No user found in storage');
+        setShowGaitAnalysis(true);
+        return;
+      }
+      
+      const userData = JSON.parse(userStr);
+      const userId = userData.user?._id || userData._id;
+      console.log('✓ User ID:', userId);
+      
+      if (!userId) {
+        console.log('❌ No user ID found in userData');
+        setShowGaitAnalysis(true);
+        return;
+      }
+      
+      const canAnalyzeResponse = await exerciseApi.canAnalyze(userId);
+      console.log('✓ canAnalyze response:', JSON.stringify(canAnalyzeResponse, null, 2));
+      
+      // Check if user is allowed to perform gait analysis
+      const isAllowed = canAnalyzeResponse.allowed;
+      console.log('✓ Is allowed:', isAllowed);
+      
+      if (!isAllowed) {
+        console.log('❌ User has incomplete exercises - redirecting to exercise plan');
+        
+        // Get today's exercise plan
+        const planResponse = await exerciseApi.getTodaysPlan();
+        console.log('✓ Plan response:', planResponse.success ? 'Success' : 'Failed');
+        
+        if (planResponse.success && planResponse.plan) {
+          console.log('✓ Showing exercise plan screen with ID:', planResponse.plan._id);
+          // Show exercise plan screen instead of gait analysis
+          setExercisePlanId(planResponse.plan._id);
+          setShowExercisePlan(true);
+          return;
+        } else {
+          console.log('❌ No plan found, showing gait analysis anyway');
+        }
+      } else {
+        console.log('✓ User is allowed - showing gait analysis screen');
+      }
+    } catch (error) {
+      console.log('❌ Error checking exercise status:', error);
+      // Continue to gait analysis if check fails
+    }
+    
+    // No incomplete exercises or check failed - show gait analysis
+    console.log('→ Displaying gait analysis screen');
     setShowGaitAnalysis(true);
   };
 
@@ -45,9 +105,59 @@ const PhysicalTherapyScreen = ({ onBack }) => {
     setShowComingSoonModal(true);
   };
 
+  // If showing exercise checklist, render that screen
+  if (showExerciseChecklist) {
+    return (
+      <ExerciseChecklistScreen 
+        navigation={{ 
+          goBack: () => setShowExerciseChecklist(false),
+          navigate: (screen, params) => {
+            if (screen === 'ExercisePlan') {
+              setExercisePlanId(params.planId);
+              setShowExerciseChecklist(false);
+              setShowExercisePlan(true);
+            } else if (screen === 'GaitAnalysis') {
+              setShowExerciseChecklist(false);
+              setShowGaitAnalysis(true);
+            }
+          }
+        }} 
+        route={{ params: { planId: exercisePlanId } }} 
+      />
+    );
+  }
+
+  // If showing exercise plan, render that screen
+  if (showExercisePlan) {
+    return (
+      <ExercisePlanScreen 
+        navigation={{ 
+          goBack: () => setShowExercisePlan(false), 
+          navigate: (screen, params) => {
+            if (screen === 'ExerciseChecklist') {
+              setExercisePlanId(params.planId);
+              setShowExercisePlan(false);
+              setShowExerciseChecklist(true);
+            }
+          }
+        }} 
+        route={{ params: { planId: exercisePlanId } }} 
+      />
+    );
+  }
+
   // If showing gait analysis, render that screen instead
   if (showGaitAnalysis) {
-    return <GaitAnalysisScreen onBack={() => setShowGaitAnalysis(false)} />;
+    return (
+      <GaitAnalysisScreen 
+        onBack={() => setShowGaitAnalysis(false)} 
+        onNavigateToExercisePlan={(planId) => {
+          setExercisePlanId(planId);
+          setShowGaitAnalysis(false);
+          setShowExercisePlan(true);
+        }}
+      />
+    );
   }
   return (
     <View style={styles.container}>
@@ -162,7 +272,7 @@ const PhysicalTherapyScreen = ({ onBack }) => {
             activeOpacity={0.8}
           >
             <View style={styles.deviceIconContainer}>
-              <Ionicons name="watch" size={40} color="#95A5A6" />
+              <Ionicons name="footsteps" size={40} color="#95A5A6" />
             </View>
             <View style={styles.deviceContent}>
               <View style={styles.titleWithBadge}>
@@ -172,10 +282,34 @@ const PhysicalTherapyScreen = ({ onBack }) => {
                 </View>
               </View>
               <Text style={[styles.deviceDescription, styles.lockedText]}>
-                Advanced gait analysis using specialized wearable sensors
+                Connect specialized wearable sensors for advanced gait analysis
               </Text>
             </View>
             <Ionicons name="lock-closed" size={24} color="#95A5A6" />
+          </TouchableOpacity>
+
+          {/* View Exercise Plan Button */}
+          <TouchableOpacity 
+            style={styles.viewExercisesButton}
+            onPress={async () => {
+              try {
+                const planResponse = await exerciseApi.getTodaysPlan();
+                if (planResponse.success && planResponse.plan) {
+                  setExercisePlanId(planResponse.plan._id);
+                  setShowExercisePlan(true);
+                } else {
+                  // No plan available
+                  alert('No exercise plan available. Complete a gait analysis first.');
+                }
+              } catch (error) {
+                console.error('Error loading exercise plan:', error);
+                alert('No exercise plan found. Please perform a gait analysis first.');
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="list" size={24} color="#0066CC" />
+            <Text style={styles.viewExercisesButtonText}>View My Exercise Plan</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -430,6 +564,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  viewExercisesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 2,
+    borderColor: '#0066CC',
+    borderStyle: 'dashed',
+  },
+  viewExercisesButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0066CC',
+    marginLeft: 8,
   },
 
   // Modal Styles

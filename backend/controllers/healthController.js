@@ -5,6 +5,7 @@ const FluencyTrial = require('../models/FluencyTrial');
 const LanguageProgress = require('../models/LanguageProgress');
 const LanguageTrial = require('../models/LanguageTrial');
 const GaitProgress = require('../models/GaitProgress');
+const ExercisePlan = require('../models/ExercisePlan');
 
 /**
  * Get all therapy progress logs for a user
@@ -164,9 +165,14 @@ exports.getUserHealthLogs = async (req, res) => {
       });
     });
 
-    // Fetch Gait/Physical Therapy Progress
+    // Fetch Gait/Physical Therapy Progress with associated exercise plans
     const gaitProgress = await GaitProgress.find({ user_id: userId })
       .sort({ created_at: -1 });
+    
+    // Get all exercise plans for this user to match with gait analyses
+    const exercisePlans = await ExercisePlan.find({ user_id: userId })
+      .select('gait_analysis_id exercises status date total_exercises exercises_completed')
+      .lean();
     
     gaitProgress.forEach(progress => {
       // Calculate overall score from multiple metrics (0-100 scale)
@@ -178,6 +184,11 @@ exports.getUserHealthLogs = async (req, res) => {
         (metrics.data_quality === 'excellent' ? 20 : 
          metrics.data_quality === 'good' ? 15 :
          metrics.data_quality === 'fair' ? 10 : 5)
+      );
+      
+      // Find associated exercise plan for this gait analysis
+      const associatedPlan = exercisePlans.find(plan => 
+        plan.gait_analysis_id && plan.gait_analysis_id.toString() === progress._id.toString()
       );
       
       logs.push({
@@ -199,6 +210,14 @@ exports.getUserHealthLogs = async (req, res) => {
         analysisDuration: progress.analysis_duration || 0,
         dataQuality: progress.data_quality || 'fair',
         gaitPhases: progress.gait_phases || [],
+        exercisePlan: associatedPlan ? {
+          planId: associatedPlan._id,
+          status: associatedPlan.status,
+          totalExercises: associatedPlan.total_exercises,
+          completedExercises: associatedPlan.exercises_completed,
+          exercises: associatedPlan.exercises,
+          createdAt: associatedPlan.date
+        } : null,
         timestamp: progress.created_at,
         createdAt: progress.created_at
       });

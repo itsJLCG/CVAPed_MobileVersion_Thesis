@@ -91,3 +91,9 @@ CVACare-Mobile/
     │   └── firebase.js        # Firebase config
     └── services/
         └── api.js             # API service layer
+
+
+
+
+.env
+apiConfig.js

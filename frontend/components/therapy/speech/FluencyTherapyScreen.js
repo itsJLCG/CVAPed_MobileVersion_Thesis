@@ -305,9 +305,11 @@ const FluencyTherapyScreen = ({ onBack }) => {
     }
   };
 
-  const processRecording = async (uri) => {
-    setIsProcessing(true);
-    setAssessmentResult(null);
+  const processRecording = async (uri, retryCount = 0) => {
+    if (retryCount === 0) {
+      setIsProcessing(true);
+      setAssessmentResult(null);
+    }
 
     try {
       const token = await AsyncStorage.getItem('token');
@@ -336,6 +338,7 @@ const FluencyTherapyScreen = ({ onBack }) => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000  // 30 second timeout
       });
 
       if (response.data.success) {
@@ -349,13 +352,33 @@ const FluencyTherapyScreen = ({ onBack }) => {
         if (response.data.fluency_score >= 60) {
           await saveProgress(response.data);
         }
+        
+        setIsProcessing(false);
       } else {
         Alert.alert('Assessment Failed', response.data.message || 'Please try again');
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      Alert.alert('Error', 'Failed to process recording. Please try again.');
-    } finally {
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && (error.code === 'ECONNABORTED' || error.message.includes('Network'))) {
+        console.log(`🔄 Retrying... Attempt ${retryCount + 1}/2`);
+        setTimeout(() => {
+          processRecording(uri, retryCount + 1);
+        }, 1000);
+        return;
+      }
+      
+      // All retries exhausted
+      let errorMsg = 'Failed to process recording.';
+      if (error.message.includes('Network')) {
+        errorMsg = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout. Please try again.';
+      }
+      
+      Alert.alert('Error', errorMsg);
       setIsProcessing(false);
     }
   };

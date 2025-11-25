@@ -179,10 +179,10 @@ if (Test-Port 5001) {
 }
 Write-Host ""
 
-# Start Python Therapy Exercises service
-Write-Host "  -> Starting Python Therapy Exercises Service (Port 5002)..." -ForegroundColor Cyan
+# Start Python Exercise Recommendation service
+Write-Host "  -> Starting Python Therapy & Exercise Service (Port 5002)..." -ForegroundColor Cyan
 Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
-Write-Host 'Python Therapy Exercises Service' -ForegroundColor Cyan
+Write-Host 'Python Therapy & Exercise Recommendation Service' -ForegroundColor Cyan
 Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
 Write-Host ''
 Set-Location -Path '$currentDir\therapy-exercises'
@@ -192,11 +192,11 @@ Set-Location -Path '$currentDir\therapy-exercises'
 
 Start-Sleep -Seconds 3
 
-# Verify Therapy service started
+# Verify Therapy & Exercise service started
 if (Test-Port 5002) {
-    Write-Host "    [OK] Therapy service running on http://localhost:5002" -ForegroundColor Green
+    Write-Host "    [OK] Therapy & Exercise service running on http://localhost:5002" -ForegroundColor Green
 } else {
-    Write-Host "    [WARN] Therapy service may not have started" -ForegroundColor Yellow
+    Write-Host "    [WARN] Therapy & Exercise service may not have started" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -235,19 +235,21 @@ Write-Host "  [2] Python Gait Analysis" -ForegroundColor White
 Write-Host "     Local: http://localhost:5001" -ForegroundColor Gray
 Write-Host "     Network: http://${localIP}:5001" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  [3] Python Therapy Exercises" -ForegroundColor White
+Write-Host "  [3] Python Therapy & Exercise Service" -ForegroundColor White
 Write-Host "     Local: http://localhost:5002" -ForegroundColor Gray
 Write-Host "     Network: http://${localIP}:5002" -ForegroundColor Gray
+Write-Host "     Services: Speech Therapy + Stroke Exercise Recommendations" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Quick Tests:" -ForegroundColor Yellow
 Write-Host "  curl http://localhost:5000/api/gait/health" -ForegroundColor Gray
 Write-Host "  curl http://localhost:5001/health" -ForegroundColor Gray
 Write-Host "  curl http://localhost:5002/api/therapy/health" -ForegroundColor Gray
+Write-Host "  curl http://localhost:5002/api/exercises/health" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Mobile App Configuration:" -ForegroundColor Yellow
 Write-Host "  Main API: http://${localIP}:5000" -ForegroundColor White
 Write-Host "  Gait Analysis: http://${localIP}:5001" -ForegroundColor White
-Write-Host "  Therapy Exercises: http://${localIP}:5002" -ForegroundColor White
+Write-Host "  Therapy & Exercises: http://${localIP}:5002" -ForegroundColor White
 Write-Host ""
 Write-Host "Press Ctrl+C in each window to stop the services" -ForegroundColor DarkGray
 Write-Host ""

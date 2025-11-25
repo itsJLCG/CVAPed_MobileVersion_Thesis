@@ -245,6 +245,59 @@ const HealthScreen = ({ onBack }) => {
                   Data Quality: {log.dataQuality}
                 </Text>
               </View>
+
+              {/* Exercise Plan Section */}
+              {log.exercisePlan && (
+                <View style={styles.exercisePlanSection}>
+                  <View style={styles.exercisePlanHeader}>
+                    <Ionicons name="fitness" size={18} color="#C9302C" />
+                    <Text style={styles.exercisePlanTitle}>Exercise Plan</Text>
+                    <View style={[
+                      styles.exercisePlanStatusBadge,
+                      { backgroundColor: log.exercisePlan.status === 'completed' ? '#4CAF50' : '#FFC107' }
+                    ]}>
+                      <Text style={styles.exercisePlanStatusText}>
+                        {log.exercisePlan.status === 'completed' ? 'Completed' : 'Active'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.exercisePlanProgress}>
+                    <Text style={styles.exercisePlanProgressText}>
+                      {log.exercisePlan.completedExercises} / {log.exercisePlan.totalExercises} exercises completed
+                    </Text>
+                    <View style={styles.exercisePlanProgressBar}>
+                      <View 
+                        style={[
+                          styles.exercisePlanProgressFill,
+                          { width: `${(log.exercisePlan.completedExercises / log.exercisePlan.totalExercises) * 100}%` }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+
+                  {log.exercisePlan.exercises && log.exercisePlan.exercises.length > 0 && (
+                    <View style={styles.exerciseList}>
+                      <Text style={styles.exerciseListTitle}>Exercises:</Text>
+                      {log.exercisePlan.exercises.map((exercise, index) => (
+                        <View key={index} style={styles.exerciseItem}>
+                          <Ionicons 
+                            name={exercise.completed ? "checkmark-circle" : "ellipse-outline"} 
+                            size={16} 
+                            color={exercise.completed ? "#4CAF50" : "#999"} 
+                          />
+                          <Text style={[
+                            styles.exerciseItemText,
+                            exercise.completed && styles.exerciseItemTextCompleted
+                          ]}>
+                            {exercise.exercise_name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
             </>
           )}
         </View>
@@ -394,16 +447,37 @@ const HealthScreen = ({ onBack }) => {
           {/* Logs List */}
           <View style={styles.logsContainer}>
             <Text style={styles.sectionTitle}>
-              Activity Timeline ({getFilteredLogs().length})
+              Activity Timeline 
+              {selectedFilter === 'all' && hasMore && !showFullHistory && healthLogs.length > 0 
+                ? ` (Showing ${getFilteredLogs().length} recent)`
+                : ` (${getFilteredLogs().length})`}
             </Text>
             
             {getFilteredLogs().length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="calendar-outline" size={64} color="#CCC" />
-                <Text style={styles.emptyStateText}>No therapy sessions yet</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Start your therapy exercises to see your progress here
+                <Text style={styles.emptyStateText}>
+                  {selectedFilter === 'all' 
+                    ? 'No therapy sessions yet' 
+                    : `No ${selectedFilter} sessions in recent activity`}
                 </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {selectedFilter === 'all'
+                    ? 'Start your therapy exercises to see your progress here'
+                    : summary && summary[selectedFilter]?.sessions > 0
+                      ? `You have ${summary[selectedFilter].sessions} ${selectedFilter} sessions total. Click "View Full History" to see all sessions.`
+                      : 'Try selecting a different therapy type or "All"'}
+                </Text>
+                
+                {selectedFilter !== 'all' && summary && summary[selectedFilter]?.sessions > 0 && (
+                  <TouchableOpacity 
+                    style={[styles.viewHistoryButton, { marginTop: 15 }]}
+                    onPress={loadFullHistory}
+                  >
+                    <Ionicons name="time-outline" size={20} color="#C9302C" />
+                    <Text style={styles.viewHistoryText}>View Full History</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <>
@@ -747,6 +821,78 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 6,
     textTransform: 'capitalize',
+  },
+  exercisePlanSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  exercisePlanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  exercisePlanTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 6,
+    flex: 1,
+  },
+  exercisePlanStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  exercisePlanStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFF',
+    textTransform: 'uppercase',
+  },
+  exercisePlanProgress: {
+    marginBottom: 10,
+  },
+  exercisePlanProgressText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  exercisePlanProgressBar: {
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  exercisePlanProgressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 3,
+  },
+  exerciseList: {
+    marginTop: 8,
+  },
+  exerciseListTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 6,
+  },
+  exerciseItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  exerciseItemText: {
+    fontSize: 12,
+    color: '#333',
+    marginLeft: 6,
+    flex: 1,
+  },
+  exerciseItemTextCompleted: {
+    color: '#999',
+    textDecorationLine: 'line-through',
   },
 });
 

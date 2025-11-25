@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -27,6 +27,9 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState([]);
   const [hasPlayedInstruction, setHasPlayedInstruction] = useState(false);
+  
+  const autoStopTimerRef = useRef(null);
+  const isStoppingRef = useRef(false);
 
   // Initial load
   useEffect(() => {
@@ -45,6 +48,9 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+      }
       Speech.stop();
       if (recording) {
         recording.stopAndUnloadAsync().catch(() => {});
@@ -237,6 +243,15 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
         return;
       }
 
+      // Clear any existing timer
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+
+      // Reset stopping flag
+      isStoppingRef.current = false;
+
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -246,8 +261,8 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
       console.log('🎤 Recording started');
 
       // Auto-stop after 30 seconds
-      setTimeout(() => {
-        if (recording) {
+      autoStopTimerRef.current = setTimeout(() => {
+        if (newRecording && !isStoppingRef.current) {
           stopRecording();
         }
       }, 30000);
@@ -258,9 +273,17 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
+    if (!recording || isStoppingRef.current) return;
+    
+    isStoppingRef.current = true;
 
     try {
+      // Clear auto-stop timer
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+
       console.log('🛑 Stopping recording');
       setIsRecording(false);
       await recording.stopAndUnloadAsync();
@@ -272,11 +295,15 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
     } catch (error) {
       console.error('Error stopping recording:', error);
       Alert.alert('Error', 'Failed to stop recording');
+    } finally {
+      isStoppingRef.current = false;
     }
   };
 
-  const processRecording = async (uri) => {
-    setIsProcessing(true);
+  const processRecording = async (uri, retryCount = 0) => {
+    if (retryCount === 0) {
+      setIsProcessing(true);
+    }
     const exercise = getCurrentExercise();
 
     try {
@@ -300,7 +327,8 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        timeout: 30000  // 30 second timeout
       });
 
       if (response.data.success) {
@@ -326,13 +354,33 @@ const ExpressiveLanguageScreen = ({ onBack, reloadTrigger }) => {
           response: transcription,
           score
         }]);
+        
+        setIsProcessing(false);
       } else {
         Alert.alert('Error', 'Failed to process recording');
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      Alert.alert('Error', 'Failed to assess recording. Please try again.');
-    } finally {
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && (error.code === 'ECONNABORTED' || error.message.includes('Network'))) {
+        console.log(`🔄 Retrying... Attempt ${retryCount + 1}/2`);
+        setTimeout(() => {
+          processRecording(uri, retryCount + 1);
+        }, 1000);
+        return;
+      }
+      
+      // All retries exhausted
+      let errorMsg = 'Failed to assess recording.';
+      if (error.message.includes('Network')) {
+        errorMsg = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout. Please try again.';
+      }
+      
+      Alert.alert('Error', errorMsg);
       setIsProcessing(false);
     }
   };

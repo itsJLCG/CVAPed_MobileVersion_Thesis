@@ -44,6 +44,8 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
   
   const recordingRef = useRef(null);
   const soundObject = useRef(null);
+  const autoStopTimerRef = useRef(null);
+  const isStoppingRef = useRef(false);
 
   const soundData = SOUND_METADATA[soundId];
   const currentLevelData = exercises?.levels?.[currentLevel];
@@ -86,6 +88,10 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
   useEffect(() => {
     setupAudio();
     return () => {
+      // Cleanup on unmount
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+      }
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync();
       }
@@ -239,6 +245,15 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
         return;
       }
 
+      // Clear any existing timer
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+
+      // Reset stopping flag
+      isStoppingRef.current = false;
+
       // Configure audio mode for recording
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -260,8 +275,8 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
       setIsRecording(true);
 
       // Auto-stop after 10 seconds
-      setTimeout(() => {
-        if (recordingRef.current) {
+      autoStopTimerRef.current = setTimeout(() => {
+        if (recordingRef.current && !isStoppingRef.current) {
           stopRecording();
         }
       }, 10000);
@@ -273,9 +288,18 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
   };
 
   const stopRecording = async () => {
-    if (!recordingRef.current) return;
+    // Prevent multiple simultaneous calls
+    if (!recordingRef.current || isStoppingRef.current) return;
+    
+    isStoppingRef.current = true;
 
     try {
+      // Clear auto-stop timer
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+
       setIsRecording(false);
       
       // Get URI before unloading
@@ -304,19 +328,27 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
         const uri = recordingRef.current?.getURI();
         if (uri) {
           await processRecording(uri);
+        } else {
+          Alert.alert('Error', 'Failed to stop recording. Please try again.');
         }
       } catch (e) {
-        Alert.alert('Error', 'Failed to stop recording.');
+        Alert.alert('Error', 'Failed to stop recording. Please try again.');
       }
       recordingRef.current = null;
+    } finally {
+      isStoppingRef.current = false;
     }
   };
 
-  const processRecording = async (audioUri) => {
-    setIsProcessing(true);
+  const processRecording = async (audioUri, retryCount = 0) => {
+    // Only set processing true on first attempt
+    if (retryCount === 0) {
+      setIsProcessing(true);
+    }
 
     try {
-      const user = JSON.parse(await AsyncStorage.getItem('user') || '{}');
+      const userData = JSON.parse(await AsyncStorage.getItem('userData') || '{}');
+      const user = userData.user || userData;
       const token = await AsyncStorage.getItem('token');
 
       const formData = new FormData();
@@ -336,7 +368,8 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        timeout: 30000  // 30 second timeout
       });
 
       if (response.data.success) {
@@ -369,19 +402,41 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
           // Automatically increment trial counter for next recording
           setCurrentTrial(currentTrial + 1);
         }
+        
+        // Success - reset processing flag
+        setIsProcessing(false);
       }
 
     } catch (error) {
       console.error('Error processing recording:', error);
-      Alert.alert('Error', 'Failed to process recording. Please try again.');
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && (error.code === 'ECONNABORTED' || error.message.includes('Network'))) {
+        console.log(`🔄 Retrying... Attempt ${retryCount + 1}/2`);
+        // Keep processing flag true and retry
+        setTimeout(() => {
+          processRecording(audioUri, retryCount + 1);
+        }, 1000);
+        return; // Exit without resetting flag
+      }
+      
+      // All retries exhausted - show error and reset flag
+      let errorMsg = 'Failed to process recording.';
+      if (error.message.includes('Network')) {
+        errorMsg = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout. Please try again.';
+      }
+      
+      Alert.alert('Error', errorMsg);
+      setIsProcessing(false);
     }
-
-    setIsProcessing(false);
   };
 
   const saveProgressToDatabase = async (avgScore, trials) => {
     try {
-      const user = JSON.parse(await AsyncStorage.getItem('user') || '{}');
+      const userData = JSON.parse(await AsyncStorage.getItem('userData') || '{}');
+      const user = userData.user || userData;
       const token = await AsyncStorage.getItem('token');
 
       const progressData = {
@@ -703,51 +758,63 @@ const ArticulationExerciseScreen = ({ route, navigation }) => {
 
                     {/* Line and points */}
                     <View style={styles.linesContainer}>
+                      {/* Draw connecting lines using small segments */}
+                      {trialDetails.map((trial, idx) => {
+                        if (idx === trialDetails.length - 1) return null;
+                        
+                        const score = trial.computed_score * 100;
+                        const nextScore = trialDetails[idx + 1]?.computed_score * 100;
+                        
+                        const x1 = (idx / Math.max(trialDetails.length - 1, 1)) * 100;
+                        const x2 = ((idx + 1) / Math.max(trialDetails.length - 1, 1)) * 100;
+                        
+                        const segments = [];
+                        const numSegments = 20; // More segments = smoother line
+                        
+                        for (let i = 0; i < numSegments; i++) {
+                          const t = i / numSegments;
+                          const x = x1 + (x2 - x1) * t;
+                          const y = score + (nextScore - score) * t;
+                          
+                          segments.push(
+                            <View
+                              key={`seg-${idx}-${i}`}
+                              style={{
+                                position: 'absolute',
+                                left: `${x}%`,
+                                bottom: `${y}%`,
+                                width: 4,
+                                height: 4,
+                                borderRadius: 2,
+                                backgroundColor: '#3b82f6',
+                                marginLeft: -2,
+                                marginBottom: -2,
+                              }}
+                            />
+                          );
+                        }
+                        
+                        return segments;
+                      })}
+                      
+                      {/* Draw data points on top */}
                       {trialDetails.map((trial, idx) => {
                         const score = trial.computed_score * 100;
-                        const nextTrial = trialDetails[idx + 1];
-                        const nextScore = nextTrial?.computed_score * 100;
-                        
-                        const leftPos = (idx / (maxTrials - 1)) * 100;
+                        const leftPos = (idx / Math.max(trialDetails.length - 1, 1)) * 100;
 
                         return (
-                          <View key={idx}>
-                            {/* Data point */}
-                            <View
-                              style={[
-                                styles.dataPoint,
-                                {
-                                  left: `${leftPos}%`,
-                                  bottom: `${score}%`,
-                                  backgroundColor: score >= passThreshold * 100 ? '#10b981' : '#f59e0b',
-                                }
-                              ]}
-                            >
-                              <Text style={styles.pointValue}>{score.toFixed(0)}%</Text>
-                            </View>
-                            
-                            {/* Line to next point */}
-                            {nextScore !== undefined && (
-                              <View style={styles.lineWrapper}>
-                                <View
-                                  style={[
-                                    styles.lineSegment,
-                                    {
-                                      position: 'absolute',
-                                      left: `${leftPos}%`,
-                                      bottom: `${score}%`,
-                                      width: `${(100 / (maxTrials - 1))}%`,
-                                      height: 3,
-                                      backgroundColor: '#3b82f6',
-                                      transform: [
-                                        { rotate: `${Math.atan2(nextScore - score, 100 / (maxTrials - 1)) * (180 / Math.PI)}deg` }
-                                      ],
-                                      transformOrigin: 'left center',
-                                    }
-                                  ]}
-                                />
-                              </View>
-                            )}
+                          <View
+                            key={`point-${idx}`}
+                            style={[
+                              styles.dataPoint,
+                              {
+                                left: `${leftPos}%`,
+                                bottom: `${score}%`,
+                                backgroundColor: score >= passThreshold * 100 ? '#10b981' : '#f59e0b',
+                              }
+                            ]}
+                          >
+                            <Text style={styles.pointValue}>{score.toFixed(0)}%</Text>
                           </View>
                         );
                       })}
@@ -1181,7 +1248,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   lineSegment: {
-    zIndex: 5,
+    zIndex: 10,
+    marginBottom: -1.5, // Center the line vertically (height is 3)
   },
   xAxis: {
     position: 'absolute',

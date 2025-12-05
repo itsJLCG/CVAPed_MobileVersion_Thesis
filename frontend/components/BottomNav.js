@@ -49,6 +49,20 @@ const BottomNav = ({ activeTab, onTabPress }) => {
 
       <TouchableOpacity 
         style={styles.navItem}
+        onPress={() => onTabPress('predictions')}
+      >
+        <Ionicons 
+          name={activeTab === 'predictions' ? 'analytics' : 'analytics-outline'} 
+          size={28} 
+          color={activeTab === 'predictions' ? '#C9302C' : '#666'} 
+        />
+        <Text style={[styles.navText, activeTab === 'predictions' && styles.navTextActive]}>
+          Predictions
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.navItem}
         onPress={() => onTabPress('profile')}
       >
         <Ionicons 

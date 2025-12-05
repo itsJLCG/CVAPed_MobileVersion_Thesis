@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TherapyScreen from './TherapyScreen';
 import ProfileScreen from './ProfileScreen';
 import HealthScreen from './HealthScreen';
+import PredictionsScreen from './PredictionsScreen';
 import BottomNav from './BottomNav';
 
 const { width, height } = Dimensions.get('window');
@@ -179,6 +180,11 @@ const HomePage = ({ userData, onLogout }) => {
     setActiveTab('home');
   };
 
+  const handlePredictionsBack = () => {
+    setCurrentScreen('home');
+    setActiveTab('home');
+  };
+
   const handleNavigateFromTherapy = (destination) => {
     console.log('Navigating from therapy to:', destination);
     setActiveTab(destination);
@@ -222,6 +228,16 @@ const HomePage = ({ userData, onLogout }) => {
     return (
       <View style={styles.container}>
         <HealthScreen onBack={handleHealthBack} />
+        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+      </View>
+    );
+  }
+
+  // Show Predictions screen if predictions tab is active
+  if (currentScreen === 'predictions') {
+    return (
+      <View style={styles.container}>
+        <PredictionsScreen onBack={handlePredictionsBack} />
         <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
     );

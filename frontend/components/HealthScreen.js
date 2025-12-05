@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { healthAPI } from '../services/api';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../config/apiConfig';
 
 const { width } = Dimensions.get('window');
 
@@ -23,9 +26,15 @@ const HealthScreen = ({ onBack }) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [predictions, setPredictions] = useState({});
+  const [fluencyPrediction, setFluencyPrediction] = useState(null);
+  const [receptivePrediction, setReceptivePrediction] = useState(null);
+  const [expressivePrediction, setExpressivePrediction] = useState(null);
+  const [overallSpeechPrediction, setOverallSpeechPrediction] = useState(null);
 
   useEffect(() => {
     fetchHealthData();
+    fetchPredictions();
   }, []);
 
   const fetchHealthData = async () => {
@@ -47,6 +56,122 @@ const HealthScreen = ({ onBack }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const fetchPredictions = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      
+      // Fetch articulation predictions
+      const sounds = ['s', 'r', 'l', 'k', 'th'];
+      const predictionPromises = sounds.map(async (soundId) => {
+        try {
+          const response = await axios.post(
+            `${API_URL}/articulation/predict-mastery`,
+            { sound_id: soundId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          if (response.data.success) {
+            return { soundId, data: response.data.prediction };
+          }
+        } catch (err) {
+          // Prediction not available
+        }
+        return { soundId, data: null };
+      });
+
+      const results = await Promise.all(predictionPromises);
+      const predictionsMap = {};
+      results.forEach(({ soundId, data }) => {
+        if (data) {
+          predictionsMap[soundId] = data;
+        }
+      });
+      
+      setPredictions(predictionsMap);
+
+      // Fetch fluency prediction
+      try {
+        const fluencyResponse = await axios.post(
+          `${API_URL}/fluency/predict-mastery`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (fluencyResponse.data.success) {
+          setFluencyPrediction(fluencyResponse.data.prediction);
+          console.log('✅ Fluency prediction loaded in HealthScreen');
+        }
+      } catch (err) {
+        console.log('Fluency prediction not available');
+      }
+
+      // Fetch receptive language prediction
+      try {
+        const receptiveResponse = await axios.post(
+          `${API_URL}/receptive/predict-mastery`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (receptiveResponse.data.success && receptiveResponse.data.prediction) {
+          // Convert confidence from 0-1 to 0-100 percentage
+          const predictionData = {
+            ...receptiveResponse.data.prediction,
+            confidence: Math.round(receptiveResponse.data.prediction.confidence * 100)
+          };
+          setReceptivePrediction(predictionData);
+          console.log('✅ Receptive language prediction loaded in HealthScreen:', predictionData);
+        }
+      } catch (err) {
+        console.log('Receptive language prediction not available');
+      }
+
+      // Fetch expressive language prediction
+      try {
+        const expressiveResponse = await axios.post(
+          `${API_URL}/expressive/predict-mastery`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (expressiveResponse.data.success && expressiveResponse.data.prediction) {
+          // Convert confidence from 0-1 to 0-100 percentage
+          const predictionData = {
+            ...expressiveResponse.data.prediction,
+            confidence: Math.round(expressiveResponse.data.prediction.confidence * 100)
+          };
+          setExpressivePrediction(predictionData);
+          console.log('✅ Expressive language prediction loaded in HealthScreen:', predictionData);
+        }
+      } catch (err) {
+        console.log('Expressive language prediction not available');
+      }
+
+      // Fetch overall speech improvement prediction (combines all therapies)
+      try {
+        const overallResponse = await axios.post(
+          `${API_URL}/speech/predict-overall-improvement`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (overallResponse.data.success && overallResponse.data.prediction) {
+          // Convert confidence from 0-1 to 0-100 percentage
+          const predictionData = {
+            ...overallResponse.data.prediction,
+            confidence: Math.round(overallResponse.data.prediction.confidence * 100)
+          };
+          setOverallSpeechPrediction(predictionData);
+          console.log('✅ Overall speech improvement prediction loaded in HealthScreen:', predictionData);
+        }
+      } catch (err) {
+        console.log('Overall speech prediction not available');
+      }
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
     }
   };
 
@@ -350,6 +475,353 @@ const HealthScreen = ({ onBack }) => {
           </View>
         )}
       </View>
+    );
+  };
+
+  const renderOverallSpeechPredictionCard = () => {
+    if (!overallSpeechPrediction) return null;
+
+    return (
+      <View style={styles.overallPredictionCard}>
+        <View style={styles.overallPredictionHeader}>
+          <Ionicons name="trophy" size={28} color="#FF6B6B" />
+          <Text style={styles.overallPredictionTitle}>Overall Speech Therapy Progress</Text>
+        </View>
+        <Text style={styles.overallPredictionSubtitle}>
+          AI prediction combining all therapy types (Articulation, Fluency, Language)
+        </Text>
+        
+        <View style={styles.overallMainStats}>
+          <View style={styles.overallStatBox}>
+            <View style={styles.overallStatHeader}>
+              <Ionicons name="calendar-outline" size={24} color="#FF6B6B" />
+              <Text style={styles.overallStatValue}>{overallSpeechPrediction.weeks_to_completion}</Text>
+            </View>
+            <Text style={styles.overallStatLabel}>Weeks to Complete</Text>
+            <Text style={styles.overallStatSubLabel}>All speech therapies</Text>
+          </View>
+          
+          <View style={styles.overallStatDivider} />
+          
+          <View style={styles.overallStatBox}>
+            <View style={styles.overallStatHeader}>
+              <Ionicons name="trending-up" size={24} color="#4CAF50" />
+              <Text style={styles.overallStatValue}>{overallSpeechPrediction.improvement_rate_per_week}%</Text>
+            </View>
+            <Text style={styles.overallStatLabel}>Weekly Improvement</Text>
+            <Text style={styles.overallStatSubLabel}>Average rate</Text>
+          </View>
+        </View>
+        
+        <View style={styles.overallDetailedStats}>
+          <View style={styles.overallDetailRow}>
+            <View style={styles.overallDetailItem}>
+              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+              <Text style={styles.overallDetailLabel}>Current Progress:</Text>
+              <Text style={styles.overallDetailValue}>{overallSpeechPrediction.current_overall_accuracy}%</Text>
+            </View>
+            <View style={styles.overallDetailItem}>
+              <Ionicons name="flash" size={18} color="#FFC107" />
+              <Text style={styles.overallDetailLabel}>Total Trials:</Text>
+              <Text style={styles.overallDetailValue}>{overallSpeechPrediction.total_trials}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.overallDetailRow}>
+            <View style={styles.overallDetailItem}>
+              <Ionicons name="layers" size={18} color="#2196F3" />
+              <Text style={styles.overallDetailLabel}>Active Therapies:</Text>
+              <Text style={styles.overallDetailValue}>{overallSpeechPrediction.therapy_types_active}/4</Text>
+            </View>
+            <View style={styles.overallDetailItem}>
+              <Ionicons name="analytics" size={18} color="#9C27B0" />
+              <Text style={styles.overallDetailLabel}>Confidence:</Text>
+              <Text style={styles.overallDetailValue}>{overallSpeechPrediction.confidence}%</Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Individual Therapy Breakdown */}
+        <View style={styles.therapyBreakdown}>
+          <Text style={styles.therapyBreakdownTitle}>Individual Therapy Accuracy:</Text>
+          <View style={styles.therapyBreakdownGrid}>
+            {overallSpeechPrediction.articulation_accuracy > 0 && (
+              <View style={styles.therapyBreakdownItem}>
+                <Text style={styles.therapyBreakdownIcon}>🗣️</Text>
+                <Text style={styles.therapyBreakdownLabel}>Articulation</Text>
+                <Text style={styles.therapyBreakdownValue}>{overallSpeechPrediction.articulation_accuracy}%</Text>
+              </View>
+            )}
+            {overallSpeechPrediction.fluency_accuracy > 0 && (
+              <View style={styles.therapyBreakdownItem}>
+                <Text style={styles.therapyBreakdownIcon}>💬</Text>
+                <Text style={styles.therapyBreakdownLabel}>Fluency</Text>
+                <Text style={styles.therapyBreakdownValue}>{overallSpeechPrediction.fluency_accuracy}%</Text>
+              </View>
+            )}
+            {overallSpeechPrediction.receptive_accuracy > 0 && (
+              <View style={styles.therapyBreakdownItem}>
+                <Text style={styles.therapyBreakdownIcon}>👂</Text>
+                <Text style={styles.therapyBreakdownLabel}>Receptive</Text>
+                <Text style={styles.therapyBreakdownValue}>{overallSpeechPrediction.receptive_accuracy}%</Text>
+              </View>
+            )}
+            {overallSpeechPrediction.expressive_accuracy > 0 && (
+              <View style={styles.therapyBreakdownItem}>
+                <Text style={styles.therapyBreakdownIcon}>📢</Text>
+                <Text style={styles.therapyBreakdownLabel}>Expressive</Text>
+                <Text style={styles.therapyBreakdownValue}>{overallSpeechPrediction.expressive_accuracy}%</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.predictionFooter}>
+          <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+          <Text style={styles.predictionFooterText}>
+            Powered by XGBoost Machine Learning (R² = 96.5%)
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderPredictionsCard = () => {
+    const availablePredictions = Object.entries(predictions);
+    if (availablePredictions.length === 0) return null;
+
+    const soundColors = {
+      s: '#C9302C',
+      r: '#4A90E2',
+      l: '#F4A460',
+      k: '#9B59B6',
+      th: '#27AE60'
+    };
+
+    const soundNames = {
+      s: 'S-Sound',
+      r: 'R-Sound',
+      l: 'L-Sound',
+      k: 'K-Sound',
+      th: 'TH-Sound'
+    };
+
+    return (
+      <View style={styles.predictionsCard}>
+        <View style={styles.predictionsHeader}>
+          <Ionicons name="trending-up" size={22} color="#1E40AF" />
+          <Text style={styles.predictionsTitle}>Articulation Mastery Predictions</Text>
+        </View>
+        <Text style={styles.predictionsSubtitle}>
+          AI-powered estimates using XGBoost Machine Learning
+        </Text>
+        
+        <View style={styles.predictionsGrid}>
+          {availablePredictions.map(([soundId, prediction]) => (
+            <View key={soundId} style={styles.predictionItem}>
+              <View style={styles.predictionItemHeader}>
+                <View style={[styles.soundBadge, { backgroundColor: soundColors[soundId] }]}>
+                  <Text style={styles.soundBadgeText}>
+                    {soundId.toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.soundName}>{soundNames[soundId]}</Text>
+              </View>
+              
+              <View style={styles.predictionDaysContainer}>
+                <Ionicons name="time-outline" size={18} color="#1E40AF" />
+                <Text style={styles.predictionDaysText}>
+                  {prediction.predicted_days} days
+                </Text>
+              </View>
+              
+              <View style={styles.predictionMeta}>
+                <Text style={styles.predictionConfidence}>
+                  {Math.round(prediction.confidence * 100)}% confidence
+                </Text>
+                {prediction.current_level > 1 && (
+                  <Text style={styles.predictionLevel}>
+                    Level {prediction.current_level}/5
+                  </Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+        
+        <View style={styles.predictionFooter}>
+          <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+          <Text style={styles.predictionFooterText}>
+            Predictions improve with more practice sessions
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderFluencyPredictionsCard = () => {
+    if (!fluencyPrediction) return null;
+
+    return (
+      <View style={styles.predictionsCard}>
+        <View style={styles.predictionsHeader}>
+          <Ionicons name="pulse" size={22} color="#8e44ad" />
+          <Text style={[styles.predictionsTitle, { color: '#8e44ad' }]}>Fluency Mastery Prediction</Text>
+        </View>
+        <Text style={styles.predictionsSubtitle}>
+          AI-powered estimate using XGBoost Machine Learning
+        </Text>
+        
+        <View style={styles.fluencyPredictionContent}>
+          <View style={styles.fluencyPredictionMain}>
+            <Ionicons name="time-outline" size={32} color="#8e44ad" />
+            <View style={styles.fluencyPredictionText}>
+              <Text style={[styles.predictionDaysLarge, { color: '#8e44ad' }]}>
+                {fluencyPrediction.predicted_days} days
+              </Text>
+              <Text style={styles.fluencyPredictionLabel}>to fluency mastery</Text>
+            </View>
+          </View>
+          
+          <View style={styles.fluencyPredictionMeta}>
+            <View style={styles.fluencyMetaItem}>
+              <Ionicons name="analytics" size={16} color="#666" />
+              <Text style={styles.fluencyMetaText}>
+                {Math.round(fluencyPrediction.confidence * 100)}% confidence
+              </Text>
+            </View>
+            {fluencyPrediction.current_level > 1 && (
+              <View style={styles.fluencyMetaItem}>
+                <Ionicons name="trending-up" size={16} color="#666" />
+                <Text style={styles.fluencyMetaText}>
+                  Current Level: {fluencyPrediction.current_level}/5
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.predictionFooter}>
+          <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+          <Text style={styles.predictionFooterText}>
+            Prediction improves with more practice sessions
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderLanguagePredictionsCards = () => {
+    if (!receptivePrediction && !expressivePrediction) return null;
+
+    return (
+      <>
+        {/* Receptive Language Prediction */}
+        {receptivePrediction && (
+          <View style={styles.predictionsCard}>
+            <View style={styles.predictionsHeader}>
+              <Ionicons name="ear" size={22} color="#4A90E2" />
+              <Text style={[styles.predictionsTitle, { color: '#4A90E2' }]}>Receptive Language Mastery Prediction</Text>
+            </View>
+            <Text style={styles.predictionsSubtitle}>
+              AI-powered estimate using XGBoost Machine Learning
+            </Text>
+            
+            <View style={styles.fluencyPredictionContent}>
+              <View style={styles.fluencyPredictionMain}>
+                <Ionicons name="time-outline" size={32} color="#4A90E2" />
+                <View style={styles.fluencyPredictionText}>
+                  <Text style={[styles.predictionDaysLarge, { color: '#4A90E2' }]}>
+                    {receptivePrediction.predicted_days} days
+                  </Text>
+                  <Text style={styles.fluencyPredictionLabel}>to receptive mastery</Text>
+                </View>
+              </View>
+              
+              <View style={styles.fluencyPredictionMeta}>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="analytics" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {receptivePrediction.confidence}% confidence
+                  </Text>
+                </View>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {receptivePrediction.current_exercises_completed || 0} exercises completed
+                  </Text>
+                </View>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="trophy" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {receptivePrediction.current_accuracy?.toFixed(0) || 0}% accuracy
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.predictionFooter}>
+              <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+              <Text style={styles.predictionFooterText}>
+                Prediction improves with more practice sessions
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Expressive Language Prediction */}
+        {expressivePrediction && (
+          <View style={styles.predictionsCard}>
+            <View style={styles.predictionsHeader}>
+              <Ionicons name="chatbox" size={22} color="#8b5cf6" />
+              <Text style={[styles.predictionsTitle, { color: '#8b5cf6' }]}>Expressive Language Mastery Prediction</Text>
+            </View>
+            <Text style={styles.predictionsSubtitle}>
+              AI-powered estimate using XGBoost Machine Learning
+            </Text>
+            
+            <View style={styles.fluencyPredictionContent}>
+              <View style={styles.fluencyPredictionMain}>
+                <Ionicons name="time-outline" size={32} color="#8b5cf6" />
+                <View style={styles.fluencyPredictionText}>
+                  <Text style={[styles.predictionDaysLarge, { color: '#8b5cf6' }]}>
+                    {expressivePrediction.predicted_days} days
+                  </Text>
+                  <Text style={styles.fluencyPredictionLabel}>to expressive mastery</Text>
+                </View>
+              </View>
+              
+              <View style={styles.fluencyPredictionMeta}>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="analytics" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {expressivePrediction.confidence}% confidence
+                  </Text>
+                </View>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {expressivePrediction.current_exercises_completed || 0} exercises completed
+                  </Text>
+                </View>
+                <View style={styles.fluencyMetaItem}>
+                  <Ionicons name="trophy" size={16} color="#666" />
+                  <Text style={styles.fluencyMetaText}>
+                    {expressivePrediction.current_accuracy?.toFixed(0) || 0}% accuracy
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.predictionFooter}>
+              <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+              <Text style={styles.predictionFooterText}>
+                Prediction improves with more practice sessions
+              </Text>
+            </View>
+          </View>
+        )}
+      </>
     );
   };
 
@@ -893,6 +1365,282 @@ const styles = StyleSheet.create({
   exerciseItemTextCompleted: {
     color: '#999',
     textDecorationLine: 'line-through',
+  },
+
+  // Predictions Card Styles (XGBoost ML)
+  predictionsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1E40AF',
+  },
+  predictionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  predictionsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+  },
+  predictionsSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  predictionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  predictionItem: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  predictionItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  soundBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  soundBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  soundName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  predictionDaysContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 4,
+  },
+  predictionDaysText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+  },
+  predictionMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  predictionConfidence: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  predictionLevel: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  predictionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 6,
+  },
+  predictionFooterText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontStyle: 'italic',
+  },
+  // Fluency Prediction Styles
+  fluencyPredictionContent: {
+    marginTop: 12,
+  },
+  fluencyPredictionMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  fluencyPredictionText: {
+    flex: 1,
+  },
+  predictionDaysLarge: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  fluencyPredictionLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  fluencyPredictionMeta: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  fluencyMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fluencyMetaText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  overallPredictionCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    borderLeftWidth: 6,
+    borderLeftColor: '#FF6B6B',
+  },
+  overallPredictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 12,
+  },
+  overallPredictionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FF6B6B',
+    flex: 1,
+  },
+  overallPredictionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 20,
+    fontStyle: 'italic',
+  },
+  overallMainStats: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  overallStatBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  overallStatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  overallStatValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  overallStatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
+  },
+  overallStatSubLabel: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+  },
+  overallStatDivider: {
+    width: 1,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
+  },
+  overallDetailedStats: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  overallDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  overallDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  overallDetailLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  overallDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  therapyBreakdown: {
+    marginBottom: 16,
+  },
+  therapyBreakdownTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  therapyBreakdownGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  therapyBreakdownItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  therapyBreakdownIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  therapyBreakdownLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 4,
+  },
+  therapyBreakdownValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });
 

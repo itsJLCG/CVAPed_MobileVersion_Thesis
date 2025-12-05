@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
+const axios = require('axios');
 const mongoose = require('mongoose');
 const LanguageProgress = require('../models/LanguageProgress');
 const User = require('../models/User');
+
+const THERAPY_SERVICE_URL = process.env.THERAPY_URL || 'http://192.168.1.33:5002';
 
 /**
  * GET /api/receptive/progress/all
@@ -327,6 +330,144 @@ router.get('/all', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch progress data'
+    });
+  }
+});
+
+/**
+ * POST /api/receptive/predict-mastery
+ * Predict days until receptive language mastery using XGBoost ML model
+ */
+router.post('/predict-mastery', protect, async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+
+    console.log(`🔮 Requesting receptive language mastery prediction for user ${userId}`);
+
+    // Forward request to therapy-exercises service (Python/XGBoost)
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/language/predict-mastery`;
+    
+    const response = await axios.post(therapyUrl, {
+      user_id: userId,
+      mode: 'receptive'
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Receptive language prediction received from therapy service`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error requesting receptive language mastery prediction:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available. Please make sure therapy service is running on port 5002.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get receptive language mastery prediction',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * POST /api/receptive/train-model
+ * Train/retrain the XGBoost receptive language mastery prediction model (Admin only)
+ */
+router.post('/train-model', protect, async (req, res) => {
+  try {
+    // Check if user is admin or therapist
+    if (!['admin', 'therapist'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized. Admin or therapist access required.'
+      });
+    }
+
+    console.log(`🤖 Requesting receptive language model training (initiated by ${req.user.email})`);
+
+    // Forward request to therapy-exercises service
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/language/train-model`;
+    
+    const response = await axios.post(therapyUrl, {
+      mode: 'receptive'
+    }, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Receptive language model training complete`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error training receptive language model:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to train receptive language model',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/receptive/model-status
+ * Get status of the receptive language mastery prediction model
+ */
+router.get('/model-status', protect, async (req, res) => {
+  try {
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/language/model-status`;
+    
+    const response = await axios.get(therapyUrl, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+    
+    // Return only receptive status
+    res.json(response.data.receptive || response.data);
+
+  } catch (error) {
+    console.error('❌ Error checking receptive language model status:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        available: false,
+        message: 'Prediction service is not available.'
+      });
+    }
+
+    res.status(500).json({
+      available: false,
+      error: error.message
     });
   }
 });

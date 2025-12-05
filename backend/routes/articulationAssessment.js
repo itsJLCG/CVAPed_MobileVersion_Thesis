@@ -257,7 +257,7 @@ router.post('/record', protect, upload.single('audio'), async (req, res) => {
       try {
         const trialData = {
           user_id: req.user._id.toString(),
-          sound_id: sound,
+          sound_id: sound_id,
           level: parseInt(level),
           item_index: parseInt(item_index),
           target: target,

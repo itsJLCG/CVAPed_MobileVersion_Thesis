@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,14 +6,63 @@ import {
   Text,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ArticulationExerciseScreen from './ArticulationExerciseScreen';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../../../config/apiConfig';
 
 const { width } = Dimensions.get('window');
 
 const ArticulationTherapyScreen = ({ onBack }) => {
   const [selectedSound, setSelectedSound] = useState(null);
+  const [predictions, setPredictions] = useState({});
+  const [loadingPredictions, setLoadingPredictions] = useState(true);
+
+  useEffect(() => {
+    fetchPredictions();
+  }, []);
+
+  const fetchPredictions = async () => {
+    try {
+      setLoadingPredictions(true);
+      const token = await AsyncStorage.getItem('token');
+      const sounds = ['s', 'r', 'l', 'k', 'th'];
+      
+      const predictionPromises = sounds.map(async (soundId) => {
+        try {
+          const response = await axios.post(
+            `${API_URL}/articulation/predict-mastery`,
+            { sound_id: soundId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          if (response.data.success) {
+            return { soundId, data: response.data.prediction };
+          }
+        } catch (err) {
+          console.log(`Prediction not available for ${soundId}`);
+        }
+        return { soundId, data: null };
+      });
+
+      const results = await Promise.all(predictionPromises);
+      const predictionsMap = {};
+      results.forEach(({ soundId, data }) => {
+        if (data) {
+          predictionsMap[soundId] = data;
+        }
+      });
+      
+      setPredictions(predictionsMap);
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+    } finally {
+      setLoadingPredictions(false);
+    }
+  };
 
   const handleBeginAssessment = (soundId) => {
     setSelectedSound(soundId);
@@ -147,6 +196,29 @@ const ArticulationTherapyScreen = ({ onBack }) => {
                   <Text style={styles.stagesText}>{program.stages}</Text>
                 </View>
 
+                {/* Mastery Prediction */}
+                {predictions[program.soundId] && (
+                  <View style={styles.predictionSection}>
+                    <View style={styles.predictionHeader}>
+                      <Ionicons name="time-outline" size={16} color={program.color} />
+                      <Text style={[styles.predictionLabel, { color: program.color }]}>
+                        TIME TO MASTERY
+                      </Text>
+                    </View>
+                    <Text style={styles.predictionDays}>
+                      {predictions[program.soundId].predicted_days} days
+                    </Text>
+                    <Text style={styles.predictionConfidence}>
+                      {Math.round(predictions[program.soundId].confidence * 100)}% confidence
+                    </Text>
+                    {predictions[program.soundId].current_level > 1 && (
+                      <Text style={styles.predictionProgress}>
+                        Current: Level {predictions[program.soundId].current_level}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
                 {/* Begin Assessment Button */}
                 <TouchableOpacity 
                   style={[styles.assessmentButton, { backgroundColor: program.color }]}
@@ -259,6 +331,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     overflow: 'hidden',
+    minHeight: 320,
   },
 
   // Symbol Badge
@@ -347,6 +420,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#2C3E50',
     fontWeight: '600',
+  },
+
+  // Prediction Section (XGBoost ML)
+  predictionSection: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  predictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 6,
+  },
+  predictionLabel: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  predictionDays: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  predictionConfidence: {
+    fontSize: 10,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  predictionProgress: {
+    fontSize: 9,
+    color: '#475569',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 
   // Assessment Button

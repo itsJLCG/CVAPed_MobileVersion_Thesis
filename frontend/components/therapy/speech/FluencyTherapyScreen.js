@@ -13,6 +13,8 @@ import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../services/api';
+import axios from 'axios';
+import { API_URL } from '../../../config/apiConfig';
 
 const FluencyTherapyScreen = ({ onBack }) => {
   const [exercises, setExercises] = useState(null);
@@ -26,6 +28,8 @@ const FluencyTherapyScreen = ({ onBack }) => {
   const [levelProgress, setLevelProgress] = useState({
     1: false, 2: false, 3: false, 4: false, 5: false
   });
+  const [prediction, setPrediction] = useState(null);
+  const [loadingPrediction, setLoadingPrediction] = useState(true);
   const [isBreathing, setIsBreathing] = useState(false);
   const [breathingPhase, setBreathingPhase] = useState(''); // 'inhale', 'hold', 'exhale', 'ready'
   const [breathingTimer, setBreathingTimer] = useState(0);
@@ -40,6 +44,7 @@ const FluencyTherapyScreen = ({ onBack }) => {
     const initialize = async () => {
       await loadExercises();
       await loadProgress();
+      await fetchPrediction();
     };
     initialize();
   }, []);
@@ -101,6 +106,28 @@ const FluencyTherapyScreen = ({ onBack }) => {
       }
     } catch (error) {
       console.error('Error loading progress:', error);
+    }
+  };
+
+  const fetchPrediction = async () => {
+    try {
+      setLoadingPrediction(true);
+      const token = await AsyncStorage.getItem('token');
+      
+      const response = await axios.post(
+        `${API_URL}/fluency/predict-mastery`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        setPrediction(response.data.prediction);
+        console.log('✅ Fluency prediction loaded:', response.data.prediction);
+      }
+    } catch (error) {
+      console.log('Prediction not available:', error.message);
+    } finally {
+      setLoadingPrediction(false);
     }
   };
 
@@ -576,6 +603,27 @@ const FluencyTherapyScreen = ({ onBack }) => {
           </View>
         </View>
 
+        {/* Mastery Prediction */}
+        {prediction && (
+          <View style={styles.predictionCard}>
+            <View style={styles.predictionHeader}>
+              <Ionicons name="time-outline" size={20} color="#8e44ad" />
+              <Text style={styles.predictionTitle}>TIME TO FLUENCY MASTERY</Text>
+            </View>
+            <Text style={styles.predictionDays}>
+              {prediction.predicted_days} days
+            </Text>
+            <Text style={styles.predictionConfidence}>
+              {Math.round(prediction.confidence * 100)}% confidence
+            </Text>
+            {prediction.current_level > 1 && (
+              <Text style={styles.predictionProgress}>
+                Current: Level {prediction.current_level}
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* Current Exercise */}
         <View style={[styles.exerciseCard, { borderLeftColor: levelInfo?.color || '#8e44ad' }]}>
           <Text style={styles.levelName}>{levelInfo?.name || `Level ${currentLevel}`}</Text>
@@ -1040,6 +1088,48 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Prediction Card Styles
+  predictionCard: {
+    backgroundColor: '#FFF',
+    margin: 15,
+    padding: 20,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8e44ad',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  predictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  predictionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8e44ad',
+    letterSpacing: 1,
+    marginLeft: 8,
+  },
+  predictionDays: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  predictionConfidence: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  predictionProgress: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
   },
 });
 

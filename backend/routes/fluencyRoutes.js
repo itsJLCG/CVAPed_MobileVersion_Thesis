@@ -6,9 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
+const axios = require('axios');
 const FluencyProgress = require('../models/FluencyProgress');
 const FluencyTrial = require('../models/FluencyTrial');
 const User = require('../models/User');
+
+const THERAPY_SERVICE_URL = process.env.THERAPY_URL || 'http://192.168.1.33:5002';
 
 /**
  * GET /api/fluency/progress/all
@@ -411,6 +414,140 @@ router.get('/all', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch progress data'
+    });
+  }
+});
+
+/**
+ * POST /api/fluency/predict-mastery
+ * Predict days until fluency mastery using XGBoost ML model
+ */
+router.post('/predict-mastery', protect, async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+
+    console.log(`🔮 Requesting fluency mastery prediction for user ${userId}`);
+
+    // Forward request to therapy-exercises service (Python/XGBoost)
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/fluency/predict-mastery`;
+    
+    const response = await axios.post(therapyUrl, {
+      user_id: userId
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Fluency prediction received from therapy service`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error requesting fluency mastery prediction:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available. Please make sure therapy service is running on port 5002.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get fluency mastery prediction',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * POST /api/fluency/train-model
+ * Train/retrain the XGBoost fluency mastery prediction model (Admin only)
+ */
+router.post('/train-model', protect, async (req, res) => {
+  try {
+    // Check if user is admin or therapist
+    if (!['admin', 'therapist'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized. Admin or therapist access required.'
+      });
+    }
+
+    console.log(`🤖 Requesting fluency model training (initiated by ${req.user.email})`);
+
+    // Forward request to therapy-exercises service
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/fluency/train-model`;
+    
+    const response = await axios.post(therapyUrl, {}, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Fluency model training complete`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error training fluency model:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to train fluency model',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/fluency/model-status
+ * Get status of the fluency mastery prediction model
+ */
+router.get('/model-status', protect, async (req, res) => {
+  try {
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/fluency/model-status`;
+    
+    const response = await axios.get(therapyUrl, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error checking fluency model status:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        available: false,
+        message: 'Prediction service is not available.'
+      });
+    }
+
+    res.status(500).json({
+      available: false,
+      error: error.message
     });
   }
 });

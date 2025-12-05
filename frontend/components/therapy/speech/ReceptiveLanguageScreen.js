@@ -24,6 +24,10 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState([]);
   const [hasPlayedInstruction, setHasPlayedInstruction] = useState(false);
+  
+  // XGBoost ML Prediction
+  const [prediction, setPrediction] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -166,6 +170,42 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
       console.error('Error loading progress:', error);
     }
   };
+
+  const fetchPrediction = async () => {
+    try {
+      setPredictionLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      
+      const response = await api.post('/receptive/predict-mastery', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success && response.data.prediction) {
+        // Convert confidence from 0-1 to 0-100 percentage
+        const predictionData = {
+          ...response.data.prediction,
+          confidence: Math.round(response.data.prediction.confidence * 100)
+        };
+        setPrediction(predictionData);
+        console.log('🔮 Receptive language mastery prediction:', predictionData);
+      }
+    } catch (error) {
+      console.error('Error fetching receptive prediction:', error);
+      if (error.response?.status !== 503) {
+        // Don't show alert for service unavailable (prediction service not running)
+        console.log('Prediction service unavailable or insufficient data');
+      }
+    } finally {
+      setPredictionLoading(false);
+    }
+  };
+
+  // Fetch prediction when component loads
+  useEffect(() => {
+    if (!isLoading && exercises.length > 0) {
+      fetchPrediction();
+    }
+  }, [isLoading, exercises.length]);
 
   const getCurrentExercise = () => exercises[currentExercise];
 
@@ -360,6 +400,36 @@ const ReceptiveLanguageScreen = ({ onBack, reloadTrigger }) => {
             />
           </View>
         </View>
+
+        {/* ML Prediction Card */}
+        {prediction && !predictionLoading && (
+          <View style={styles.predictionCard}>
+            <View style={styles.predictionHeader}>
+              <Ionicons name="analytics" size={20} color="#4A90E2" />
+              <Text style={styles.predictionTitle}>AI Mastery Prediction</Text>
+            </View>
+            <View style={styles.predictionContent}>
+              <View style={styles.predictionMain}>
+                <Text style={styles.predictionDays}>{prediction.predicted_days}</Text>
+                <Text style={styles.predictionLabel}>days to receptive mastery</Text>
+              </View>
+              <View style={styles.predictionStats}>
+                <View style={styles.predictionStat}>
+                  <Text style={styles.statValue}>{prediction.confidence}%</Text>
+                  <Text style={styles.statLabel}>Confidence</Text>
+                </View>
+                <View style={styles.predictionStat}>
+                  <Text style={styles.statValue}>{prediction.current_exercises_completed || 0}</Text>
+                  <Text style={styles.statLabel}>Completed</Text>
+                </View>
+                <View style={styles.predictionStat}>
+                  <Text style={styles.statValue}>{prediction.current_accuracy?.toFixed(0) || 0}%</Text>
+                  <Text style={styles.statLabel}>Accuracy</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Instruction */}
         <View style={styles.instructionCard}>
@@ -668,6 +738,67 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontSize: 16,
     fontWeight: '600',
+  },
+  predictionCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4A90E2',
+  },
+  predictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  predictionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  predictionContent: {
+    gap: 12,
+  },
+  predictionMain: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  predictionDays: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4A90E2',
+  },
+  predictionLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  predictionStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  predictionStat: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
 });
 

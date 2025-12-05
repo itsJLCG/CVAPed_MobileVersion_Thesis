@@ -75,8 +75,19 @@ if (-not (Test-Path "therapy-exercises\venv")) {
     pip install --upgrade pip
     pip install -r therapy-exercises\requirements.txt
     Write-Host "[OK] Therapy venv created and dependencies installed" -ForegroundColor Green
+    Write-Host "[INFO] XGBoost Articulation Mastery Prediction installed" -ForegroundColor Cyan
 } else {
     Write-Host "[OK] Therapy venv found" -ForegroundColor Green
+    # Check if XGBoost ML dependencies are installed
+    & therapy-exercises\venv\Scripts\Activate.ps1
+    $xgboostCheck = & python -c "import xgboost; print('ok')" 2>&1
+    if ($xgboostCheck -notmatch "ok") {
+        Write-Host "[WARN] XGBoost ML dependencies missing. Installing..." -ForegroundColor Yellow
+        pip install -r therapy-exercises\requirements.txt --quiet
+        Write-Host "[OK] XGBoost dependencies installed" -ForegroundColor Green
+    } else {
+        Write-Host "[OK] XGBoost ML ready for articulation predictions" -ForegroundColor Green
+    }
 }
 Write-Host ""
 
@@ -238,13 +249,14 @@ Write-Host ""
 Write-Host "  [3] Python Therapy & Exercise Service" -ForegroundColor White
 Write-Host "     Local: http://localhost:5002" -ForegroundColor Gray
 Write-Host "     Network: http://${localIP}:5002" -ForegroundColor Gray
-Write-Host "     Services: Speech Therapy + Stroke Exercise Recommendations" -ForegroundColor DarkGray
+Write-Host "     Services: Speech Therapy + Stroke Exercise + XGBoost ML Predictions" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Quick Tests:" -ForegroundColor Yellow
 Write-Host "  curl http://localhost:5000/api/gait/health" -ForegroundColor Gray
 Write-Host "  curl http://localhost:5001/health" -ForegroundColor Gray
 Write-Host "  curl http://localhost:5002/api/therapy/health" -ForegroundColor Gray
 Write-Host "  curl http://localhost:5002/api/exercises/health" -ForegroundColor Gray
+Write-Host "  curl http://localhost:5002/api/articulation/model-status" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Mobile App Configuration:" -ForegroundColor Yellow
 Write-Host "  Main API: http://${localIP}:5000" -ForegroundColor White

@@ -32,6 +32,7 @@ const fluencyAssessmentRoutes = require('./routes/fluencyAssessment');
 const fluencyRoutes = require('./routes/fluencyRoutes');
 const receptiveRoutes = require('./routes/receptiveRoutes');
 const expressiveRoutes = require('./routes/expressiveRoutes');
+const speechRoutes = require('./routes/speechRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 
 // Mount routers
@@ -46,6 +47,7 @@ app.use('/api/fluency', fluencyRoutes);  // Fluency progress & exercises
 app.use('/api/fluency', fluencyAssessmentRoutes);  // Fluency assessment
 app.use('/api/receptive', receptiveRoutes);  // Receptive language therapy
 app.use('/api/expressive', expressiveRoutes);  // Expressive language therapy
+app.use('/api/speech', speechRoutes);  // Overall speech improvement prediction
 
 // Admin progress endpoints (separate registration for cleaner URLs)
 app.use('/api/articulation-progress', articulationRoutes);

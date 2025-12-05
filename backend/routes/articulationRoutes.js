@@ -440,6 +440,156 @@ router.post('/progress', protect, async (req, res) => {
 });
 
 /**
+ * POST /api/articulation/predict-mastery
+ * Predict days until mastery for a specific sound using XGBoost ML model
+ */
+router.post('/predict-mastery', protect, async (req, res) => {
+  try {
+    const { sound_id } = req.body;
+    const userId = req.user._id.toString();
+
+    if (!sound_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'sound_id is required'
+      });
+    }
+
+    if (!['s', 'r', 'l', 'k', 'th'].includes(sound_id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid sound_id. Must be one of: s, r, l, k, th'
+      });
+    }
+
+    console.log(`🔮 Requesting mastery prediction for user ${userId}, sound '${sound_id}'`);
+
+    // Forward request to therapy-exercises service (Python/XGBoost)
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/articulation/predict-mastery`;
+    
+    const response = await axios.post(therapyUrl, {
+      user_id: userId,
+      sound_id: sound_id
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Prediction received from therapy service`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error requesting mastery prediction:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available. Please make sure therapy service is running on port 5002.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get mastery prediction',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * POST /api/articulation/train-model
+ * Train/retrain the XGBoost mastery prediction model (Admin only)
+ */
+router.post('/train-model', protect, async (req, res) => {
+  try {
+    // Check if user is admin or therapist
+    if (!['admin', 'therapist'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized. Admin or therapist access required.'
+      });
+    }
+
+    console.log(`🤖 Requesting model training (initiated by ${req.user.email})`);
+
+    // Forward request to therapy-exercises service
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/articulation/train-model`;
+    
+    const response = await axios.post(therapyUrl, {}, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Model training complete`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error training model:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prediction service is not available.',
+        error: 'PREDICTION_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to train model',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/articulation/model-status
+ * Get status of the mastery prediction model
+ */
+router.get('/model-status', protect, async (req, res) => {
+  try {
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/articulation/model-status`;
+    
+    const response = await axios.get(therapyUrl, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error checking model status:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        available: false,
+        message: 'Prediction service is not available.'
+      });
+    }
+
+    res.status(500).json({
+      available: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * GET /api/articulation-progress/all
  * Get all articulation progress for all users (Admin endpoint)
  */

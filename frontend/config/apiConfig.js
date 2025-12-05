@@ -1,4 +1,4 @@
-const BASE_IP = '192.168.1.64';
+const BASE_IP = '192.168.1.33';
 
 // Port Configuration (matches backend .env)
 const PORTS = {
@@ -20,6 +20,11 @@ export const API_CONFIG = {
   // Therapy Exercises service
   THERAPY_API_URL: `http://${BASE_IP}:${PORTS.THERAPY}`,
 };
+
+// Export individual URLs for convenience
+export const API_URL = `http://${BASE_IP}:${PORTS.MAIN_API}/api`;
+export const GAIT_API_URL = `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`;
+export const THERAPY_API_URL = `http://${BASE_IP}:${PORTS.THERAPY}`;
 
 // For debugging - log the current configuration
 console.log('📡 API Configuration:', {

@@ -34,6 +34,9 @@ from language_mastery_predictor import LanguageMasteryPredictor
 # Import Overall Speech Improvement Prediction (XGBoost ML - Combines All Therapies)
 from overall_speech_predictor import OverallSpeechPredictor
 
+# Import Therapy Prioritization & Sequencing (Decision Rules + Graph-Based)
+from therapy_prioritization import generate_therapy_prioritization
+
 # Load environment variables
 load_dotenv()
 
@@ -861,6 +864,137 @@ def overall_model_status():
             'error': str(e)
         }), 500
 
+
+# ============================================================================
+# PRESCRIPTIVE ANALYSIS ENDPOINTS
+# Intelligent Therapy Prioritization & Sequencing (Decision Rules + Graph-Based)
+# ============================================================================
+
+@app.route('/api/therapy/prescriptive/<user_id>', methods=['GET'])
+def get_therapy_prioritization(user_id):
+    """
+    Get intelligent therapy prioritization and sequencing recommendations
+    Uses Decision Rules + Graph-Based Recommendations
+    
+    Returns:
+    - Therapy priorities (HIGH/MEDIUM/LOW) with reasoning
+    - Weekly practice schedule
+    - Actionable recommendations
+    - Cross-therapy insights
+    - Bottleneck analysis
+    - Optimal therapy sequence
+    """
+    try:
+        print(f"\n{'='*60}")
+        print(f"🎯 Prescriptive Analysis Request Received")
+        print(f"{'='*60}")
+        print(f"User ID: {user_id}")
+        print(f"Timestamp: {datetime.now()}")
+        print(f"{'='*60}\n")
+        
+        # Generate prescriptive analysis
+        print("📊 Generating therapy prioritization...")
+        result = generate_therapy_prioritization(user_id)
+        print("✅ Prescriptive analysis generated successfully\n")
+        
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'data': result
+        }), 200
+        
+    except Exception as e:
+        print(f"\n{'='*60}")
+        print(f"❌ Error in prescriptive analysis: {e}")
+        print(f"{'='*60}")
+        traceback.print_exc()
+        print(f"{'='*60}\n")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to generate therapy prioritization'
+        }), 500
+
+
+@app.route('/api/therapy/prescriptive/priorities/<user_id>', methods=['GET'])
+def get_priorities_only(user_id):
+    """Get just the priority list without full analysis"""
+    try:
+        result = generate_therapy_prioritization(user_id)
+        
+        return jsonify({
+            'success': True,
+            'priorities': result['priorities'],
+            'generated_at': result['generated_at']
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/therapy/prescriptive/schedule/<user_id>', methods=['GET'])
+def get_weekly_schedule(user_id):
+    """Get just the weekly practice schedule"""
+    try:
+        result = generate_therapy_prioritization(user_id)
+        
+        return jsonify({
+            'success': True,
+            'schedule': result['weekly_schedule'],
+            'generated_at': result['generated_at']
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/therapy/prescriptive/insights/<user_id>', methods=['GET'])
+def get_therapy_insights(user_id):
+    """Get recommendations and insights only"""
+    try:
+        result = generate_therapy_prioritization(user_id)
+        
+        return jsonify({
+            'success': True,
+            'recommendations': result['recommendations'],
+            'insights': result['insights'],
+            'cross_therapy_insights': result['cross_therapy_insights'],
+            'generated_at': result['generated_at']
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/therapy/prescriptive/bottlenecks/<user_id>', methods=['GET'])
+def get_therapy_bottlenecks(user_id):
+    """Get bottleneck analysis (which therapy is blocking others)"""
+    try:
+        result = generate_therapy_prioritization(user_id)
+        
+        return jsonify({
+            'success': True,
+            'bottleneck_analysis': result['bottleneck_analysis'],
+            'optimal_sequence': result['optimal_sequence'],
+            'generated_at': result['generated_at']
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.getenv('THERAPY_PORT', 5002))
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
@@ -874,6 +1008,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print("📦 Services Available:")
     print("   ├─ Speech Therapy (Fluency, Language, Articulation)")
+    print("   ├─ Predictive Analysis (XGBoost ML Models)")
+    print("   ├─ Prescriptive Analysis (Decision Rules + Graph-Based)")
     print("   └─ Stroke Exercise Recommendations (Physical Therapy)")
     print("=" * 60)
     

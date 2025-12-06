@@ -15,6 +15,7 @@ import TherapyScreen from './TherapyScreen';
 import ProfileScreen from './ProfileScreen';
 import HealthScreen from './HealthScreen';
 import PredictionsScreen from './PredictionsScreen';
+import PrescriptiveScreen from './PrescriptiveScreen';
 import BottomNav from './BottomNav';
 
 const { width, height } = Dimensions.get('window');
@@ -185,6 +186,11 @@ const HomePage = ({ userData, onLogout }) => {
     setActiveTab('home');
   };
 
+  const handlePrescriptiveBack = () => {
+    setCurrentScreen('home');
+    setActiveTab('home');
+  };
+
   const handleNavigateFromTherapy = (destination) => {
     console.log('Navigating from therapy to:', destination);
     setActiveTab(destination);
@@ -238,6 +244,16 @@ const HomePage = ({ userData, onLogout }) => {
     return (
       <View style={styles.container}>
         <PredictionsScreen onBack={handlePredictionsBack} />
+        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+      </View>
+    );
+  }
+
+  // Show Prescriptive screen if prescriptive tab is active
+  if (currentScreen === 'prescriptive') {
+    return (
+      <View style={styles.container}>
+        <PrescriptiveScreen onBack={handlePrescriptiveBack} />
         <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
     );

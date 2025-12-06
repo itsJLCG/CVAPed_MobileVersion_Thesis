@@ -9,6 +9,7 @@ const THERAPY_API_URL = API_CONFIG.THERAPY_API_URL;
 // Create axios instance for main API
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 30000, // 30 second timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -17,6 +18,7 @@ const api = axios.create({
 // Create axios instance for therapy exercises API
 const therapyApi = axios.create({
   baseURL: THERAPY_API_URL,
+  timeout: 30000, // 30 second timeout
   headers: {
     'Content-Type': 'application/json',
   },

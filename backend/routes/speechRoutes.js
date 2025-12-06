@@ -139,4 +139,187 @@ router.get('/overall-model-status', protect, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/speech/prescriptive/:userId
+ * Get intelligent therapy prioritization and sequencing recommendations
+ * Uses Decision Rules + Graph-Based Recommendations
+ */
+router.get('/prescriptive/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Verify user can only access their own data unless admin
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized. Can only access your own therapy prioritization.'
+      });
+    }
+
+    console.log(`🎯 Requesting prescriptive analysis for user ${userId}`);
+
+    // Forward request to therapy-exercises service (Python Decision Rules + Graph-Based)
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/therapy/prescriptive/${userId}`;
+    
+    const response = await axios.get(therapyUrl, {
+      headers: {
+        'Authorization': req.headers.authorization
+      }
+    });
+
+    console.log(`✅ Prescriptive analysis received from therapy service`);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error requesting prescriptive analysis:', error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Prescriptive analysis service is not available. Please make sure therapy service is running on port 5002.',
+        error: 'PRESCRIPTIVE_SERVICE_UNAVAILABLE'
+      });
+    }
+
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get prescriptive analysis',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/speech/prescriptive/priorities/:userId
+ * Get just the priority list without full analysis
+ */
+router.get('/prescriptive/priorities/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/therapy/prescriptive/priorities/${userId}`;
+    const response = await axios.get(therapyUrl);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/speech/prescriptive/schedule/:userId
+ * Get weekly practice schedule
+ */
+router.get('/prescriptive/schedule/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/therapy/prescriptive/schedule/${userId}`;
+    const response = await axios.get(therapyUrl);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/speech/prescriptive/insights/:userId
+ * Get recommendations and insights only
+ */
+router.get('/prescriptive/insights/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/therapy/prescriptive/insights/${userId}`;
+    const response = await axios.get(therapyUrl);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * GET /api/speech/prescriptive/bottlenecks/:userId
+ * Get bottleneck analysis (which therapy is blocking others)
+ */
+router.get('/prescriptive/bottlenecks/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    const therapyUrl = `${THERAPY_SERVICE_URL}/api/therapy/prescriptive/bottlenecks/${userId}`;
+    const response = await axios.get(therapyUrl);
+    
+    res.json(response.data);
+
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+});
+
 module.exports = router;

@@ -1,8 +1,7 @@
 # 🚀 CVACare Mobile - Setup Guide
 ## 📥 Step 1: Clone ang Repository
 
-git clone https://github.com/dairymilkyway/CVACare-Mobile.git
-cd CVACare-Mobile
+git clone https://github.com/itsJLCG/CVAPed_MobileVersion_Thesis
 
 ## ⚙️ Step 2: Backend Setup
 ### A. Install Dependencies
@@ -27,17 +26,18 @@ npm install
 ### Update API Configuration
 I-edit ang `frontend/config/apiConfig.js`:
 
-export const API_CONFIG = {
-  // Palitan ng iyong local IP address
-  MAIN_API_URL: 'http://192.168.1.XXX:3000',  
-  THERAPY_API_URL: 'http://192.168.1.XXX:5001',
-};
+palitan ang const BASE_IP = '10.109.35.145';
 
 **Para malaman ang iyong IP address:**
 ipconfig
 Hanapin ang `IPv4 Address` (Example: 192.168.1.100)
 
 Pa edit mga URL ng tamang IPV4 nyo like sa api.config.js and sa .env
+
+
+# Service Json
+
+Tapos ung serviceAccountKey.json send ko na langdin kasama ng env lalagay sya under backend -> config
 
 
 ## 🚀 Step 5: Run ang Application
@@ -97,3 +97,20 @@ CVACare-Mobile/
 
 .env
 apiConfig.js
+
+
+
+
+
+
+cd backend
+.\start-all.ps1
+
+
+
+cd frontend
+npx expo start
+
+
+
+Bukas i set up natin sya sa data ko para yung ip same na lang.

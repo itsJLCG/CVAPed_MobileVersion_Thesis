@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { healthAPI } from '../services/api';
@@ -890,9 +892,11 @@ const HealthScreen = ({ onBack }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft} />
         <Text style={styles.headerTitle}>Health Logs</Text>
-        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={24} color="#C9302C" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+            <Ionicons name="refresh" size={24} color="#C9302C" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error ? (
@@ -990,6 +994,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    marginTop: Platform.OS === 'android' ? -StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
@@ -997,6 +1002,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 15,
     paddingVertical: 15,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 15 : 15,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
@@ -1005,15 +1011,19 @@ const styles = StyleSheet.create({
     width: 34,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    textAlign: 'center',
   },
   headerRight: {
     width: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   refreshButton: {
-    padding: 5,
+    padding: 0,
   },
   loadingContainer: {
     flex: 1,

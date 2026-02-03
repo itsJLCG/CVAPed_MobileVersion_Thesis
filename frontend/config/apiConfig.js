@@ -1,4 +1,4 @@
-const BASE_IP = '10.109.35.145';
+const BASE_IP = '10.72.103.225';
 
 // Port Configuration (matches backend .env)
 const PORTS = {

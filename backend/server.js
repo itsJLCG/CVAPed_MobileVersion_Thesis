@@ -15,12 +15,6 @@ app.use(express.urlencoded({ extended: false }));
 // Enable CORS
 app.use(cors());
 
-// Connect to database and make it accessible
-connectDB().then(db => {
-  app.locals.db = db;
-  console.log('✅ Database instance made available to routes');
-});
-
 // Route files (loaded after app is created)
 const authRoutes = require('./routes/authRoutes');
 const gaitRoutes = require('./routes/gaitRoutes');
@@ -34,6 +28,13 @@ const receptiveRoutes = require('./routes/receptiveRoutes');
 const expressiveRoutes = require('./routes/expressiveRoutes');
 const speechRoutes = require('./routes/speechRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const successStoryRoutes = require('./routes/successStoryRoutes');
+
+// Connect to database and make it accessible
+connectDB().then(db => {
+  app.locals.db = db;
+  console.log('✅ Database instance made available to routes');
+});
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -41,6 +42,7 @@ app.use('/api/gait', gaitRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);  // Health logs and summary
+app.use('/api/success-stories', successStoryRoutes);  // Success stories
 app.use('/api/articulation', articulationRoutes);  // Progress & exercises
 app.use('/api/articulation', articulationAssessmentRoutes);  // Recording assessment
 app.use('/api/fluency', fluencyRoutes);  // Fluency progress & exercises
@@ -48,6 +50,9 @@ app.use('/api/fluency', fluencyAssessmentRoutes);  // Fluency assessment
 app.use('/api/receptive', receptiveRoutes);  // Receptive language therapy
 app.use('/api/expressive', expressiveRoutes);  // Expressive language therapy
 app.use('/api/speech', speechRoutes);  // Overall speech improvement prediction
+
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
 
 // Admin progress endpoints (separate registration for cleaner URLs)
 app.use('/api/articulation-progress', articulationRoutes);

@@ -396,7 +396,7 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
                 />
                 <View style={styles.optionText}>
                   <Text style={[styles.optionTitle, therapyType === 'speech' && styles.optionTitleSelected]}>
-                    Speech Therapy
+                    Speech/Language Therapy
                   </Text>
                   <Text style={styles.optionDescription}>For pediatric speech and language development</Text>
                 </View>

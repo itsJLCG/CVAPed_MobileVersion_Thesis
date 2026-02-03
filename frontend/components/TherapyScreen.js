@@ -27,7 +27,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
       id: 1,
       name: 'Physical Therapy',
       icon: require('../assets/CVACare_Physical_Therapy.png'),
-      description: 'Specialized treatment to restore movement, reduce pain, and improve physical function. Our expert therapists help you recover from injuries, manage chronic conditions, and enhance your overall mobility.',
+      description: 'Treatment to restore movement, reduce pain, and improve function for stroke patients.',
       features: [
         'Movement Restoration',
         'Pain Management',
@@ -39,9 +39,9 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
     },
     {
       id: 2,
-      name: 'Speech Therapy',
+      name: 'Speech/Language Therapy',
       icon: require('../assets/CVACare_Speech_Therapy.png'),
-      description: 'Comprehensive speech therapy programs designed to improve communication skills for children. Choose from three specialized therapy types tailored to specific needs.',
+      description: 'Speech and language therapy programs to improve communication skills for children.',
       subheading: 'Available Therapy Types:',
       therapyTypes: [
         {
@@ -50,14 +50,14 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
         },
         {
           name: 'Language Therapy:',
-          description: 'Receptive and expressive language development',
+          description: 'F – Fluency, N – Naming, C – Comprehension, R – Repetition',
         },
         {
           name: 'Fluency Therapy:',
-          description: 'Stuttering reduction and speech rate control',
+          description: 'Speech flow and rhythm improvement',
         },
       ],
-      buttonText: 'Explore Speech Therapy Options',
+      buttonText: 'Explore Speech/Language Therapy Options',
       buttonColor: '#6B9AC4',
     },
   ];
@@ -77,7 +77,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
     // Navigate to the appropriate therapy screen
     if (therapyType === 'Physical Therapy') {
       setShowPhysicalTherapy(true);
-    } else if (therapyType === 'Speech Therapy') {
+    } else if (therapyType === 'Speech/Language Therapy') {
       setShowSpeechTherapy(true);
     }
   };
@@ -184,7 +184,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
               </View>
               <View style={styles.benefitItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#27AE60" />
-                <Text style={styles.benefitText}>Speech Therapy for Pedia</Text>
+                <Text style={styles.benefitText}>Speech/Language Therapy for Pedia</Text>
               </View>
               <View style={styles.benefitItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#27AE60" />
@@ -368,6 +368,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 15,
+    minHeight: 240,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -407,12 +408,13 @@ const styles = StyleSheet.create({
     height: 130,
   },
   therapyName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#2C3E50',
     textAlign: 'center',
     paddingHorizontal: 5,
     marginBottom: 8,
+    lineHeight: 18,
   },
   tapHintContainer: {
     flexDirection: 'row',

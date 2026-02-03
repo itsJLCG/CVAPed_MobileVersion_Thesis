@@ -18,7 +18,9 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import api, { successStoryAPI } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,6 +101,16 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     is_active: true
   });
 
+  // Success Story states
+  const [successStories, setSuccessStories] = useState([]);
+  const [showSuccessStoryModal, setShowSuccessStoryModal] = useState(false);
+  const [editingStory, setEditingStory] = useState(null);
+  const [newStory, setNewStory] = useState({
+    patientName: '',
+    story: '',
+    images: []
+  });
+
   useEffect(() => {
     loadUserData();
   }, []);
@@ -114,6 +126,8 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       loadReceptiveExercises();
     } else if (activeTab === 'articulation') {
       loadArticulationExercises();
+    } else if (activeTab === 'success-stories') {
+      loadSuccessStories();
     }
   }, [activeTab, activeSubTab]);
 
@@ -138,6 +152,8 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       await loadReceptiveExercises();
     } else if (activeTab === 'articulation') {
       await loadArticulationExercises();
+    } else if (activeTab === 'success-stories') {
+      await loadSuccessStories();
     }
     setRefreshing(false);
   };
@@ -1066,6 +1082,154 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     setShowArticulationModal(true);
   };
 
+  // ==================== SUCCESS STORY FUNCTIONS ====================
+  const loadSuccessStories = async () => {
+    try {
+      setLoading(true);
+      const response = await successStoryAPI.getAll();
+      if (response.success) {
+        setSuccessStories(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading success stories:', error);
+      Alert.alert('Error', 'Failed to load success stories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddSuccessStory = () => {
+    setEditingStory(null);
+    setNewStory({
+      patientName: '',
+      story: '',
+      images: []
+    });
+    setShowSuccessStoryModal(true);
+  };
+
+  const handleEditSuccessStory = (story) => {
+    setEditingStory(story);
+    setNewStory({
+      patientName: story.patientName,
+      story: story.story,
+      images: story.images || []
+    });
+    setShowSuccessStoryModal(true);
+  };
+
+  const handlePickImages = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        allowsEditing: false,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages = result.assets.map(asset => ({
+          uri: asset.uri,
+          name: asset.fileName || `image_${Date.now()}.jpg`,
+          type: asset.type || 'image/jpeg'
+        }));
+        setNewStory(prev => ({
+          ...prev,
+          images: [...prev.images, ...newImages]
+        }));
+      }
+    } catch (error) {
+      console.error('Error picking images:', error);
+      Alert.alert('Error', 'Failed to pick images');
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setNewStory(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSaveSuccessStory = async () => {
+    try {
+      if (!newStory.patientName.trim()) {
+        Alert.alert('Validation Error', 'Patient name is required');
+        return;
+      }
+      if (!newStory.story.trim()) {
+        Alert.alert('Validation Error', 'Success story content is required');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('patientName', newStory.patientName.trim());
+      formData.append('story', newStory.story.trim());
+
+      // Append images with proper format for React Native
+      newStory.images.forEach((image, index) => {
+        if (image.uri) {
+          // Get file extension from URI or name
+          const uriParts = image.uri.split('.');
+          const fileType = uriParts[uriParts.length - 1];
+          
+          formData.append('images', {
+            uri: image.uri,
+            name: image.name || `image_${Date.now()}_${index}.${fileType}`,
+            type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`
+          });
+        }
+      });
+
+      let response;
+      if (editingStory) {
+        response = await successStoryAPI.update(editingStory.id, formData);
+      } else {
+        console.log('Sending success story with', newStory.images.length, 'images');
+        response = await successStoryAPI.create(formData);
+      }
+
+      if (response.success) {
+        Alert.alert(
+          'Success',
+          editingStory ? 'Success story updated!' : 'Success story created!'
+        );
+        setShowSuccessStoryModal(false);
+        loadSuccessStories();
+      }
+    } catch (error) {
+      console.error('Error saving success story:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      Alert.alert('Error', error.message || error || 'Failed to save success story');
+    }
+  };
+
+  const handleDeleteSuccessStory = async (storyId) => {
+    Alert.alert(
+      'Delete Success Story',
+      'Are you sure you want to delete this success story?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await successStoryAPI.delete(storyId);
+              if (response.success) {
+                Alert.alert('Success', 'Success story deleted!');
+                loadSuccessStories();
+              }
+            } catch (error) {
+              console.error('Error deleting success story:', error);
+              Alert.alert('Error', 'Failed to delete success story');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // ==================== RENDER FUNCTIONS ====================
   const loadPatientProgress = async () => {
     try {
@@ -1648,6 +1812,129 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     );
   };
 
+  const renderSuccessStoriesTab = () => {
+    const API_URL = 'http://10.0.2.2:5000'; // For Android emulator
+    
+    const truncateText = (text, maxLength = 80) => {
+      if (!text) return '';
+      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    };
+
+    const formatDate = (dateString) => {
+      if (!dateString) return 'N/A';
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+
+    return (
+      <ScrollView
+        style={styles.tabContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#C9302C']} />
+        }
+      >
+        {/* Header with Add Button */}
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Success Stories</Text>
+            <Text style={styles.sectionSubtitle}>
+              {successStories.length} {successStories.length === 1 ? 'story' : 'stories'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddSuccessStory}>
+            <Ionicons name="add-circle" size={24} color="#FFF" />
+            <Text style={styles.addButtonText}>Add Story</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Success Stories List */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#C9302C" />
+            <Text style={styles.loadingText}>Loading stories...</Text>
+          </View>
+        ) : successStories.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="star-outline" size={60} color="#CCC" />
+            <Text style={styles.emptyText}>No success stories yet</Text>
+            <Text style={styles.emptySubtext}>
+              Create inspiring success stories to showcase patient achievements
+            </Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={handleAddSuccessStory}>
+              <Text style={styles.emptyButtonText}>Add First Story</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          successStories.map((story) => (
+            <View key={story.id} style={styles.storyCard}>
+              {/* Story Header */}
+              <View style={styles.storyHeader}>
+                <View style={styles.storyHeaderLeft}>
+                  <Ionicons name="person-circle" size={40} color="#C9302C" />
+                  <View style={styles.storyHeaderInfo}>
+                    <Text style={styles.storyPatientName}>{story.patientName}</Text>
+                    <Text style={styles.storyDate}>{formatDate(story.createdAt)}</Text>
+                  </View>
+                </View>
+                <View style={styles.storyActions}>
+                  <TouchableOpacity onPress={() => handleEditSuccessStory(story)} style={styles.iconButton}>
+                    <Ionicons name="create-outline" size={20} color="#6B9AC4" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteSuccessStory(story.id)} style={styles.iconButton}>
+                    <Ionicons name="trash-outline" size={20} color="#C9302C" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Images */}
+              {story.images && story.images.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyImages}>
+                  {story.images.map((img, idx) => (
+                    <Image
+                      key={idx}
+                      source={{ uri: img }}
+                      style={styles.storyImage}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* Story Content */}
+              <View style={styles.storyContent}>
+                <Text style={styles.storyText}>{truncateText(story.story, 150)}</Text>
+                {story.story.length > 150 && (
+                  <Text style={styles.readMoreText}>Read more...</Text>
+                )}
+              </View>
+
+              {/* Story Footer */}
+              <View style={styles.storyFooter}>
+                <View style={styles.storyMeta}>
+                  <Ionicons name="images-outline" size={14} color="#999" />
+                  <Text style={styles.storyMetaText}>
+                    {story.images?.length || 0} {story.images?.length === 1 ? 'image' : 'images'}
+                  </Text>
+                </View>
+                {story.createdByName && (
+                  <View style={styles.storyMeta}>
+                    <Ionicons name="person-outline" size={14} color="#999" />
+                    <Text style={styles.storyMetaText}>By {story.createdByName}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))
+        )}
+
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1739,6 +2026,20 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
             Patient Progress
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'success-stories' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('success-stories')}
+        >
+          <Ionicons 
+            name="star" 
+            size={16} 
+            color={activeTab === 'success-stories' ? '#FFF' : '#666'} 
+          />
+          <Text style={[styles.tabButtonText, activeTab === 'success-stories' && styles.tabButtonTextActive]}>
+            Success Stories
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Content */}
@@ -1748,6 +2049,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
         {activeTab === 'language' && renderLanguageTab()}
         {activeTab === 'articulation' && renderArticulationTab()}
         {activeTab === 'progress' && renderProgressTab()}
+        {activeTab === 'success-stories' && renderSuccessStoriesTab()}
       </View>
 
       {/* Fluency Modal */}
@@ -2638,6 +2940,113 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Success Story Modal */}
+      <Modal
+        visible={showSuccessStoryModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          setShowSuccessStoryModal(false);
+          setEditingStory(null);
+        }}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingStory ? 'Edit Success Story' : 'Add Success Story'}
+              </Text>
+              <TouchableOpacity onPress={() => {
+                setShowSuccessStoryModal(false);
+                setEditingStory(null);
+              }}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.label}>Patient Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newStory.patientName}
+                onChangeText={(text) => setNewStory({...newStory, patientName: text})}
+                placeholder="Enter patient name"
+              />
+
+              <Text style={styles.label}>Success Story *</Text>
+              <TextInput
+                style={[styles.input, styles.textAreaLarge]}
+                value={newStory.story}
+                onChangeText={(text) => setNewStory({...newStory, story: text})}
+                placeholder="Share the patient's inspiring recovery journey..."
+                multiline
+                numberOfLines={6}
+              />
+
+              <View style={styles.imagesSection}>
+                <View style={styles.imagesSectionHeader}>
+                  <Text style={styles.label}>Images</Text>
+                  <TouchableOpacity style={styles.pickImagesButton} onPress={handlePickImages}>
+                    <Ionicons name="images" size={18} color="#FFF" />
+                    <Text style={styles.pickImagesButtonText}>Pick Images</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {newStory.images && newStory.images.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagePreviewScroll}>
+                    {newStory.images.map((img, index) => (
+                      <View key={index} style={styles.imagePreviewContainer}>
+                        <Image
+                          source={{ uri: img.uri || img }}
+                          style={styles.imagePreview}
+                          resizeMode="cover"
+                        />
+                        <TouchableOpacity
+                          style={styles.removeImageButton}
+                          onPress={() => handleRemoveImage(index)}
+                        >
+                          <Ionicons name="close-circle" size={24} color="#C9302C" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+
+                {(!newStory.images || newStory.images.length === 0) && (
+                  <View style={styles.emptyImagesContainer}>
+                    <Ionicons name="image-outline" size={40} color="#CCC" />
+                    <Text style={styles.emptyImagesText}>No images selected</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setShowSuccessStoryModal(false);
+                  setEditingStory(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton]} 
+                onPress={handleSaveSuccessStory}
+              >
+                <Text style={styles.saveButtonText}>
+                  {editingStory ? 'Update' : 'Create'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -3381,6 +3790,149 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
+  },
+  // Success Story Styles
+  storyCard: {
+    backgroundColor: '#FFF',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  storyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  storyHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  storyHeaderInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  storyPatientName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  storyDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  storyActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  storyImages: {
+    marginBottom: 12,
+  },
+  storyImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  storyContent: {
+    marginBottom: 12,
+  },
+  storyText: {
+    fontSize: 14,
+    color: '#2C3E50',
+    lineHeight: 20,
+  },
+  readMoreText: {
+    fontSize: 12,
+    color: '#6B9AC4',
+    marginTop: 4,
+  },
+  storyFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  storyMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  storyMetaText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  imagesSection: {
+    marginBottom: 16,
+  },
+  imagesSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pickImagesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6B9AC4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  pickImagesButtonText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  imagePreviewScroll: {
+    marginTop: 8,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+  },
+  emptyImagesContainer: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  emptyImagesText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#999',
+  },
+  textAreaLarge: {
+    height: 120,
+    textAlignVertical: 'top',
   },
 });
 

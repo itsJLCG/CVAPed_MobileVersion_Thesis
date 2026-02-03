@@ -374,7 +374,7 @@ exports.login = async (req, res) => {
 
     // Check for user (include password field)
     console.log('🔍 Finding user in database...');
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select('+password +otp +otpExpiry');
 
     if (!user) {
       console.log('❌ User not found');
@@ -401,10 +401,38 @@ exports.login = async (req, res) => {
     // Check if user is verified
     console.log('🔍 Checking verification status...');
     if (!user.isVerified) {
-      console.log('❌ User not verified');
-      return res.status(401).json({
+      console.log('❌ User not verified - sending OTP redirect response');
+      
+      // Generate and send new OTP if not exists or expired
+      const currentTime = new Date();
+      const otpExpiry = user.otpExpiry ? new Date(user.otpExpiry) : null;
+      
+      if (!user.otp || !otpExpiry || currentTime > otpExpiry) {
+        console.log('🔢 Generating new OTP for unverified user...');
+        const newOtp = generateOTP();
+        const newOtpExpiry = generateOTPExpiry();
+        
+        user.otp = newOtp;
+        user.otpExpiry = newOtpExpiry;
+        await user.save();
+        
+        // Send OTP email
+        try {
+          const fullName = `${user.firstName} ${user.lastName}`;
+          await sendOTPEmail(email, newOtp, fullName);
+          console.log('✅ New OTP sent to user email');
+        } catch (emailError) {
+          console.error('⚠️  Error sending OTP email:', emailError.message);
+        }
+      } else {
+        console.log('📧 Existing OTP is still valid');
+      }
+      
+      return res.status(403).json({
         success: false,
-        message: 'Please verify your email first'
+        requiresVerification: true,
+        email: user.email,
+        message: 'Please verify your email. A verification code has been sent to your email.'
       });
     }
     console.log('✅ User is verified');
@@ -546,6 +574,15 @@ exports.googleAuth = async (req, res) => {
       if (!user.googleId) {
         user.googleId = googleId;
         user.picture = picture;
+        
+        // If user was previously unverified (registered via email), verify them now
+        if (!user.isVerified) {
+          console.log('📧 User was unverified, verifying via Google Sign-In...');
+          user.isVerified = true;
+          user.otp = undefined;
+          user.otpExpiry = undefined;
+        }
+        
         // Ensure firstName and lastName are set from name if they don't exist
         if (!user.firstName || !user.lastName) {
           const nameParts = name.split(' ');

@@ -580,6 +580,89 @@ export const exerciseApi = {
   }
 };
 
+// Success Story API endpoints
+export const successStoryAPI = {
+  // Get all success stories (public)
+  getAll: async () => {
+    try {
+      const response = await api.get('/success-stories');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Create success story (therapist only)
+  create: async (formData) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      console.log('🔑 Token:', token ? 'Present' : 'Missing');
+      console.log('📤 Sending to:', `${API_URL}/success-stories`);
+      console.log('📦 FormData has images:', formData._parts ? formData._parts.length : 'unknown');
+      
+      const response = await api.post('/success-stories', formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 second timeout for image uploads
+      });
+      return response.data;
+    } catch (error) {
+      console.error('❌ API Error:', error.message);
+      console.error('Error response:', error.response?.data);
+      console.error('Error code:', error.code);
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Update success story (therapist only)
+  update: async (storyId, formData) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await api.put(`/success-stories/${storyId}`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 second timeout for image uploads
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Delete success story (therapist only)
+  delete: async (storyId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await api.delete(`/success-stories/${storyId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Remove image from success story (therapist only)
+  removeImage: async (storyId, imagePath) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await api.post(`/success-stories/${storyId}/remove-image`, 
+        { imagePath },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+};
+
 export default {
   ...api,
   baseURL: THERAPY_API_URL, // Export base URL for manual fetch calls
@@ -587,5 +670,6 @@ export default {
   adminAPI,
   authAPI,
   healthAPI,
-  exerciseApi
+  exerciseApi,
+  successStoryAPI
 };

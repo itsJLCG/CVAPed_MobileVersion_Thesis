@@ -29,6 +29,9 @@ exports.register = async (req, res) => {
       lastName,
       email,
       password,
+      phone,
+      age,
+      gender,
       therapyType,
       patientType,
       // Speech therapy - child fields
@@ -50,6 +53,7 @@ exports.register = async (req, res) => {
     } = req.body;
     
     console.log('📝 Extracted fields - FirstName:', firstName, 'LastName:', lastName, 'Email:', email);
+    console.log('📝 Age:', age, 'Gender:', gender);
     console.log('📝 Therapy Type:', therapyType, 'Patient Type:', patientType);
 
     // Basic validation
@@ -87,6 +91,9 @@ exports.register = async (req, res) => {
       lastName,
       email,
       password,
+      phone,
+      age,
+      gender,
       otp,
       otpExpiry,
       isVerified: false,

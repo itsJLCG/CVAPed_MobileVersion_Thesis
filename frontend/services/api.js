@@ -663,6 +663,149 @@ export const successStoryAPI = {
   },
 };
 
+// Therapist API
+export const therapistAPI = {
+  // Get reports data
+  getReports: async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await api.get('/therapist/reports', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+};
+
+// Appointment Service - matches web's appointmentService structure
+export const appointmentAPI = {
+  // ==================== THERAPIST ENDPOINTS ====================
+  therapist: {
+    // Get all appointments for therapist
+    getAppointments: async (filters = {}) => {
+      try {
+        const params = new URLSearchParams();
+        if (filters.date) params.append('date', filters.date);
+        if (filters.status) params.append('status', filters.status);
+        if (filters.therapy_type) params.append('therapy_type', filters.therapy_type);
+
+        const response = await api.get(`/therapist/appointments?${params.toString()}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Get unassigned appointments
+    getUnassignedAppointments: async (therapyType = null) => {
+      try {
+        const params = therapyType ? `?therapy_type=${therapyType}` : '';
+        const response = await api.get(`/therapist/appointments/unassigned${params}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Assign therapist to appointment
+    assignToAppointment: async (appointmentId) => {
+      try {
+        const response = await api.put(`/therapist/appointments/${appointmentId}/assign`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Create a new appointment
+    createAppointment: async (appointmentData) => {
+      try {
+        const response = await api.post('/therapist/appointments', appointmentData);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Update an appointment
+    updateAppointment: async (appointmentId, updateData) => {
+      try {
+        const response = await api.put(`/therapist/appointments/${appointmentId}`, updateData);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Cancel/delete an appointment
+    cancelAppointment: async (appointmentId) => {
+      try {
+        const response = await api.delete(`/therapist/appointments/${appointmentId}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Search patients by name
+    searchPatients: async (query, limit = 10) => {
+      try {
+        const response = await api.get(`/therapist/patients/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+  },
+
+  // ==================== PATIENT ENDPOINTS ====================
+  patient: {
+    // Get all appointments for patient
+    getAppointments: async (status = null) => {
+      try {
+        const params = status ? `?status=${status}` : '';
+        const response = await api.get(`/patient/appointments${params}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Book a new appointment
+    bookAppointment: async (appointmentData) => {
+      try {
+        const response = await api.post('/patient/appointments/book', appointmentData);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
+    // Cancel an appointment
+    cancelAppointment: async (appointmentId, reason = '') => {
+      try {
+        const response = await api.put(`/patient/appointments/${appointmentId}/cancel`, { reason });
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+  },
+
+  // ==================== SHARED ENDPOINTS ====================
+  getAvailableTherapists: async (therapyType = null) => {
+    try {
+      const params = therapyType ? `?therapy_type=${therapyType}` : '';
+      const response = await api.get(`/therapists/available${params}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+};
+
 export default {
   ...api,
   baseURL: THERAPY_API_URL, // Export base URL for manual fetch calls
@@ -671,5 +814,7 @@ export default {
   authAPI,
   healthAPI,
   exerciseApi,
-  successStoryAPI
+  successStoryAPI,
+  therapistAPI,
+  appointmentAPI
 };

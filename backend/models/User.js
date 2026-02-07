@@ -40,6 +40,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  age: {
+    type: Number,
+    min: [1, 'Age must be at least 1'],
+    max: [120, 'Age must be less than 120']
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', 'prefer-not-to-say']
+  },
   isVerified: {
     type: Boolean,
     default: false

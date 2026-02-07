@@ -29,6 +29,8 @@ const expressiveRoutes = require('./routes/expressiveRoutes');
 const speechRoutes = require('./routes/speechRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const successStoryRoutes = require('./routes/successStoryRoutes');
+const therapistRoutes = require('./routes/therapistRoutes');
+const appointmentRoutes = require('./routes/appointmentRoutes');
 
 // Connect to database and make it accessible
 connectDB().then(db => {
@@ -50,6 +52,8 @@ app.use('/api/fluency', fluencyAssessmentRoutes);  // Fluency assessment
 app.use('/api/receptive', receptiveRoutes);  // Receptive language therapy
 app.use('/api/expressive', expressiveRoutes);  // Expressive language therapy
 app.use('/api/speech', speechRoutes);  // Overall speech improvement prediction
+app.use('/api/therapist', therapistRoutes);  // Therapist analytics and reports
+app.use('/api', appointmentRoutes);  // Appointment scheduling (patient + therapist + shared)
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

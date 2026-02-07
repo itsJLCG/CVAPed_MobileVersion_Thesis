@@ -17,6 +17,7 @@ import ProfileScreen from './ProfileScreen';
 import HealthScreen from './HealthScreen';
 import PredictionsScreen from './PredictionsScreen';
 import PrescriptiveScreen from './PrescriptiveScreen';
+import AppointmentsScreen from './AppointmentsScreen';
 import SuccessStoryDetailScreen from './SuccessStoryDetailScreen';
 import BottomNav from './BottomNav';
 
@@ -155,6 +156,11 @@ const HomePage = ({ userData, onLogout }) => {
     setActiveTab('home');
   };
 
+  const handleScheduleBack = () => {
+    setCurrentScreen('home');
+    setActiveTab('home');
+  };
+
   const handleNavigateFromTherapy = (destination) => {
     console.log('Navigating from therapy to:', destination);
     setActiveTab(destination);
@@ -228,6 +234,16 @@ const HomePage = ({ userData, onLogout }) => {
     return (
       <View style={styles.container}>
         <PrescriptiveScreen onBack={handlePrescriptiveBack} />
+        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+      </View>
+    );
+  }
+
+  // Show Schedule/Appointments screen if schedule tab is active
+  if (currentScreen === 'schedule') {
+    return (
+      <View style={styles.container}>
+        <AppointmentsScreen onBack={handleScheduleBack} />
         <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
     );

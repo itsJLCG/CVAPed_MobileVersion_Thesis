@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,10 +8,14 @@ import {
   ScrollView,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhysicalTherapyScreen from './therapy/PhysicalTherapyScreen';
 import SpeechTherapyScreen from './therapy/SpeechTherapyScreen';
+import InitialDiagnosticModal from './InitialDiagnosticModal';
+import { authAPI } from '../services/api';
 import BottomNav from './BottomNav';
 
 const { width, height } = Dimensions.get('window');
@@ -21,6 +25,61 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('therapy');
   const [showPhysicalTherapy, setShowPhysicalTherapy] = useState(false);
   const [showSpeechTherapy, setShowSpeechTherapy] = useState(false);
+
+  // Diagnostic modal state
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
+  const [diagnosticStatus, setDiagnosticStatus] = useState(null);
+  const [showBanner, setShowBanner] = useState(false);
+
+  // Check if user has already answered the diagnostic question
+  useEffect(() => {
+    const checkDiagnosticStatus = async () => {
+      try {
+        const storedUserData = await AsyncStorage.getItem('userData');
+        if (storedUserData) {
+          const user = JSON.parse(storedUserData);
+          if (user.hasInitialDiagnostic == null) {
+            // Never answered — show modal
+            setShowDiagnosticModal(true);
+          } else if (user.hasInitialDiagnostic === true) {
+            // Already diagnosed
+            setDiagnosticStatus(true);
+          } else {
+            // Answered "No" — show guidance banner
+            setDiagnosticStatus(false);
+            setShowBanner(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking diagnostic status:', error);
+      }
+    };
+    checkDiagnosticStatus();
+  }, []);
+
+  const handleDiagnosticConfirm = async (hasVisited) => {
+    setDiagnosticLoading(true);
+    try {
+      await authAPI.updateDiagnosticStatus(hasVisited);
+      setShowDiagnosticModal(false);
+      setDiagnosticStatus(hasVisited);
+      if (hasVisited) {
+        Alert.alert('Thank You', 'Your diagnostic status has been recorded.');
+      } else {
+        Alert.alert(
+          'Recommendation',
+          'We recommend scheduling an initial diagnostic assessment at our facility.'
+        );
+        setShowBanner(true);
+      }
+    } catch (error) {
+      console.error('Error updating diagnostic status:', error);
+      Alert.alert('Error', 'Failed to save your response. Please try again.');
+    } finally {
+      setDiagnosticLoading(false);
+    }
+  };
 
   const therapyTypes = [
     {
@@ -132,6 +191,41 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
           <Text style={styles.mainTitle}>Choose Your Therapy Type</Text>
           <Text style={styles.subtitle}>Select the therapy service you need</Text>
         </View>
+
+        {/* Guidance Banner for users without initial diagnostic */}
+        {diagnosticStatus === false && showBanner && (
+          <View style={styles.diagnosticBanner}>
+            <View style={styles.bannerContent}>
+              <View style={styles.bannerTextRow}>
+                <Ionicons name="information-circle" size={22} color="#1E40AF" />
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTextBold}>No initial assessment on file.</Text>
+                  <Text style={styles.bannerText}>
+                    For the best therapy results, we recommend visiting our facility for a professional diagnostic assessment. You can still explore therapy exercises in the meantime.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowBanner(false)}
+                  style={styles.bannerCloseBtn}
+                >
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.bannerActionBtn}
+                onPress={() => {
+                  if (onNavigate) {
+                    onNavigate('schedule');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.bannerActionText}>Book Your Initial Assessment</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.therapyGrid}>
           {therapyTypes.map((therapy) => (
@@ -279,6 +373,14 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
 
       {/* Bottom Navbar */}
       <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+
+      {/* Initial Diagnostic Check Modal */}
+      <InitialDiagnosticModal
+        isOpen={showDiagnosticModal}
+        onClose={() => setShowDiagnosticModal(false)}
+        onConfirm={handleDiagnosticConfirm}
+        loading={diagnosticLoading}
+      />
     </View>
   );
 };
@@ -346,6 +448,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#7F8C8D',
     textAlign: 'center',
+  },
+
+  // Diagnostic Banner
+  diagnosticBanner: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 4,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    overflow: 'hidden',
+  },
+  bannerContent: {
+    padding: 14,
+  },
+  bannerTextRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  bannerTextContainer: {
+    flex: 1,
+  },
+  bannerTextBold: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E3A5F',
+    marginBottom: 4,
+  },
+  bannerText: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 19,
+  },
+  bannerCloseBtn: {
+    padding: 4,
+  },
+  bannerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  bannerActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 
   // Therapy Grid

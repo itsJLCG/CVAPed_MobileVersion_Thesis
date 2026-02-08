@@ -157,6 +157,26 @@ export const authAPI = {
       throw error.response?.data || { message: error.message || 'Unknown error' };
     }
   },
+
+  // Update Diagnostic Status
+  updateDiagnosticStatus: async (hasInitialDiagnostic) => {
+    try {
+      const response = await api.put('/auth/diagnostic-status', { hasInitialDiagnostic });
+      if (response.data.data) {
+        // Update stored user data with new diagnostic status
+        const storedUserData = await AsyncStorage.getItem('userData');
+        if (storedUserData) {
+          const userData = JSON.parse(storedUserData);
+          userData.hasInitialDiagnostic = response.data.data.hasInitialDiagnostic;
+          userData.diagnosticStatusUpdatedAt = response.data.data.diagnosticStatusUpdatedAt;
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        }
+      }
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: error.message || 'Unknown error' };
+    }
+  },
 };
 
 // Admin API endpoints
@@ -806,6 +826,81 @@ export const appointmentAPI = {
   },
 };
 
+// Diagnostic Comparison Service
+// Mirrors web's diagnosticComparisonService (facility vs at-home comparison)
+export const diagnosticComparisonAPI = {
+  // Therapist: Create a facility diagnostic for a patient
+  createDiagnostic: async (diagnosticData) => {
+    try {
+      const response = await api.post('/therapist/diagnostics', diagnosticData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Therapist: Get all facility diagnostics for a patient
+  getDiagnostics: async (userId) => {
+    try {
+      const response = await api.get(`/therapist/diagnostics/${userId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Therapist: Update a facility diagnostic
+  updateDiagnostic: async (diagnosticId, updateData) => {
+    try {
+      const response = await api.put(`/therapist/diagnostics/${diagnosticId}`, updateData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Therapist: Delete a facility diagnostic
+  deleteDiagnostic: async (diagnosticId) => {
+    try {
+      const response = await api.delete(`/therapist/diagnostics/${diagnosticId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Therapist: Get comparison data (facility vs home) for a patient
+  getComparison: async (userId, diagnosticId = null) => {
+    try {
+      const params = diagnosticId ? `?diagnostic_id=${diagnosticId}` : '';
+      const response = await api.get(`/therapist/diagnostics/${userId}/comparison${params}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Therapist: Get comparison history (all diagnostics with scores for trend chart)
+  getComparisonHistory: async (userId) => {
+    try {
+      const response = await api.get(`/therapist/diagnostics/${userId}/comparison-history`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Patient: Get own comparison (read-only)
+  getMyComparison: async () => {
+    try {
+      const response = await api.get('/diagnostic-comparison');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+};
+
 export default {
   ...api,
   baseURL: THERAPY_API_URL, // Export base URL for manual fetch calls
@@ -816,5 +911,6 @@ export default {
   exerciseApi,
   successStoryAPI,
   therapistAPI,
-  appointmentAPI
+  appointmentAPI,
+  diagnosticComparisonAPI
 };

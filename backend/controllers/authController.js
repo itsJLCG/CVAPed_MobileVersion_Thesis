@@ -465,6 +465,7 @@ exports.login = async (req, res) => {
         patientInfo: user.patientInfo,
         picture: user.picture,
         googleId: user.googleId,
+        hasInitialDiagnostic: user.hasInitialDiagnostic,
         token: token
       }
     });
@@ -523,6 +524,60 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// @desc    Update diagnostic status
+// @route   PUT /api/auth/diagnostic-status
+// @access  Private
+exports.updateDiagnosticStatus = async (req, res) => {
+  try {
+    const { hasInitialDiagnostic } = req.body;
+
+    if (hasInitialDiagnostic === undefined || hasInitialDiagnostic === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'hasInitialDiagnostic is required'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        hasInitialDiagnostic: Boolean(hasInitialDiagnostic),
+        diagnosticStatusUpdatedAt: new Date()
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Diagnostic status updated successfully',
+      data: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        therapyType: user.therapyType,
+        patientType: user.patientType,
+        hasInitialDiagnostic: user.hasInitialDiagnostic,
+        diagnosticStatusUpdatedAt: user.diagnosticStatusUpdatedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update diagnostic status',
+      error: error.message
     });
   }
 };
@@ -638,6 +693,7 @@ exports.googleAuth = async (req, res) => {
           parentInfo: user.parentInfo,
           patientInfo: user.patientInfo,
           googleId: user.googleId,
+          hasInitialDiagnostic: user.hasInitialDiagnostic,
           token: token
         }
       });
@@ -830,6 +886,7 @@ exports.completeProfile = async (req, res) => {
         parentInfo: user.parentInfo,
         patientInfo: user.patientInfo,
         isVerified: user.isVerified,
+        hasInitialDiagnostic: user.hasInitialDiagnostic,
         token: token
       }
     });

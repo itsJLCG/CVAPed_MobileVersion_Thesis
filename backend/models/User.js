@@ -106,6 +106,15 @@ const userSchema = new mongoose.Schema({
     },
     phone: String
   },
+  // Initial diagnostic check
+  hasInitialDiagnostic: {
+    type: Boolean,
+    default: null
+  },
+  diagnosticStatusUpdatedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -187,7 +187,7 @@ const RegisterScreen = ({ onLogin, onRegisterSuccess, onGoogleSignIn }) => {
       const response = await authAPI.register(registrationData);
       Alert.alert(
         'Success',
-        'Registration successful! Please check your email for OTP.',
+        'Registration successful!',
         [{ text: 'OK', onPress: () => onRegisterSuccess(email) }]
       );
     } catch (error) {

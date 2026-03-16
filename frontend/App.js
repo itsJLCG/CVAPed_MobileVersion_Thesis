@@ -7,7 +7,6 @@ import SplashScreen from './components/SplashScreen';
 import LandingPage from './components/LandingPage';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
-import OTPScreen from './components/OTPScreen';
 import ProfileCompletionScreen from './components/ProfileCompletionScreen';
 import HomePage from './components/HomePage';
 import AdminDashboard from './components/AdminDashboard';
@@ -22,10 +21,8 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
   const [showHome, setShowHome] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
   const [userData, setUserData] = useState(null);
   const [googleUserData, setGoogleUserData] = useState(null);
   const [appIsReady, setAppIsReady] = useState(false);
@@ -81,23 +78,7 @@ export default function App() {
   };
 
   const handleRegisterSubmit = (email) => {
-    setUserEmail(email);
     setShowRegister(false);
-    setShowOTP(true);
-  };
-
-  const handleRequiresVerification = (email) => {
-    console.log('User requires email verification:', email);
-    setUserEmail(email);
-    setShowLogin(false);
-    setShowOTP(true);
-  };
-
-  const handleVerifyOTP = (userData) => {
-    console.log('OTP Verified, user data:', userData);
-    // Store user data and token (implement AsyncStorage later)
-    // Redirect to login screen after successful verification
-    setShowOTP(false);
     setShowLogin(true);
   };
 
@@ -238,18 +219,6 @@ export default function App() {
           onLogin={handleBackToLogin}
           onRegisterSuccess={handleRegisterSubmit}
           onGoogleSignIn={handleGoogleSignIn}
-        />
-        <StatusBar style="auto" />
-      </SafeAreaWrapper>
-    );
-  }
-
-  if (showOTP) {
-    return (
-      <SafeAreaWrapper>
-        <OTPScreen 
-          email={userEmail}
-          onVerify={handleVerifyOTP}
         />
         <StatusBar style="auto" />
       </SafeAreaWrapper>

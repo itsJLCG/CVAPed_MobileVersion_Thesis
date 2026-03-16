@@ -30,8 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
     "mongoose": "^7.5.0",
-    "multer": "^2.0.2",
-    "nodemailer": "^6.9.7"
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

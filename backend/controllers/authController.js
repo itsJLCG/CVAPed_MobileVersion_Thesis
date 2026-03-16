@@ -1,8 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
-const { generateOTP, generateOTPExpiry, verifyOTP } = require('../utils/otpService');
-const { sendOTPEmail } = require('../utils/emailService');
 const { OAuth2Client } = require('google-auth-library');
 const { createOrUpdateFirebaseUser } = require('../config/firebaseAdmin');
 
@@ -16,7 +14,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register user (sends OTP)
+// @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
@@ -78,13 +76,7 @@ exports.register = async (req, res) => {
     }
     console.log('✅ User does not exist, proceeding...');
 
-    // Generate OTP
-    console.log('🔢 Generating OTP...');
-    const otp = generateOTP();
-    const otpExpiry = generateOTPExpiry();
-    console.log('✅ OTP generated:', otp, 'Expires:', otpExpiry);
-
-    // Create user (unverified)
+    // Create user
     console.log('💾 Creating user in database...');
     const userData = {
       firstName,
@@ -94,9 +86,7 @@ exports.register = async (req, res) => {
       phone,
       age,
       gender,
-      otp,
-      otpExpiry,
-      isVerified: false,
+      isVerified: true,
       role: 'patient', // Always set role to patient for new registrations
       therapyType,
       patientType
@@ -162,25 +152,13 @@ exports.register = async (req, res) => {
     console.log('✅ User created successfully:', user._id);
 
     if (user) {
-      // Send OTP email
-      console.log('📧 Sending OTP email...');
-      try {
-        const fullName = `${firstName} ${lastName}`;
-        await sendOTPEmail(email, otp, fullName);
-        console.log('✅ OTP email sent successfully');
-      } catch (emailError) {
-        console.error('⚠️  Error sending OTP email:', emailError.message);
-        // Continue even if email fails
-      }
-
       console.log('✅ Registration completed successfully');
       res.status(201).json({
         success: true,
-        message: 'Registration successful. Please verify your email with the OTP sent.',
+        message: 'Registration successful.',
         data: {
           _id: user._id,
-          email: user.email,
-          requiresVerification: true
+          email: user.email
         }
       });
     } else {
@@ -199,154 +177,6 @@ exports.register = async (req, res) => {
     });
   }
   console.log('=== REGISTER REQUEST ENDED ===\n');
-};
-
-// @desc    Verify OTP
-// @route   POST /api/auth/verify-otp
-// @access  Public
-exports.verifyOTP = async (req, res) => {
-  console.log('\n=== VERIFY OTP REQUEST STARTED ===');
-  console.log('Request Body:', JSON.stringify(req.body, null, 2));
-  
-  try {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      console.log('❌ Missing email or OTP');
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and OTP'
-      });
-    }
-    console.log('📝 Verifying OTP for email:', email);
-
-    // Find user with OTP fields
-    console.log('🔍 Finding user with OTP...');
-    const user = await User.findOne({ email }).select('+otp +otpExpiry');
-
-    if (!user) {
-      console.log('❌ User not found');
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    console.log('✅ User found:', user._id);
-    console.log('🔢 Stored OTP:', user.otp, 'Provided OTP:', otp);
-
-    // Verify OTP
-    console.log('🔐 Verifying OTP...');
-    const verification = verifyOTP(user.otp, user.otpExpiry, otp);
-
-    if (!verification.valid) {
-      console.log('❌ OTP verification failed:', verification.message);
-      return res.status(400).json({
-        success: false,
-        message: verification.message
-      });
-    }
-    console.log('✅ OTP verified successfully');
-
-    // Update user as verified and clear OTP
-    console.log('💾 Updating user verification status...');
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpiry = undefined;
-    await user.save();
-    console.log('✅ User verified and OTP cleared');
-
-    // Sync to Firebase Authentication
-    await createOrUpdateFirebaseUser({
-      uid: user._id.toString(),
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      isVerified: user.isVerified
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully',
-      data: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        isVerified: user.isVerified,
-        token: generateToken(user._id)
-      }
-    });
-  } catch (error) {
-    console.error('❌ VERIFY OTP ERROR:', error);
-    console.error('Error Stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-  console.log('=== VERIFY OTP REQUEST ENDED ===\n');
-};
-
-// @desc    Resend OTP
-// @route   POST /api/auth/resend-otp
-// @access  Public
-exports.resendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email'
-      });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'User is already verified'
-      });
-    }
-
-    // Generate new OTP
-    const otp = generateOTP();
-    const otpExpiry = generateOTPExpiry();
-
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
-
-    // Send OTP email
-    try {
-      await sendOTPEmail(email, otp, user.name);
-    } catch (emailError) {
-      console.error('Error sending OTP email:', emailError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to send OTP email'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'OTP resent successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
 // @desc    Login user
@@ -381,7 +211,7 @@ exports.login = async (req, res) => {
 
     // Check for user (include password field)
     console.log('🔍 Finding user in database...');
-    const user = await User.findOne({ email }).select('+password +otp +otpExpiry');
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
       console.log('❌ User not found');
@@ -404,45 +234,6 @@ exports.login = async (req, res) => {
       });
     }
     console.log('✅ Password matched');
-
-    // Check if user is verified
-    console.log('🔍 Checking verification status...');
-    if (!user.isVerified) {
-      console.log('❌ User not verified - sending OTP redirect response');
-      
-      // Generate and send new OTP if not exists or expired
-      const currentTime = new Date();
-      const otpExpiry = user.otpExpiry ? new Date(user.otpExpiry) : null;
-      
-      if (!user.otp || !otpExpiry || currentTime > otpExpiry) {
-        console.log('🔢 Generating new OTP for unverified user...');
-        const newOtp = generateOTP();
-        const newOtpExpiry = generateOTPExpiry();
-        
-        user.otp = newOtp;
-        user.otpExpiry = newOtpExpiry;
-        await user.save();
-        
-        // Send OTP email
-        try {
-          const fullName = `${user.firstName} ${user.lastName}`;
-          await sendOTPEmail(email, newOtp, fullName);
-          console.log('✅ New OTP sent to user email');
-        } catch (emailError) {
-          console.error('⚠️  Error sending OTP email:', emailError.message);
-        }
-      } else {
-        console.log('📧 Existing OTP is still valid');
-      }
-      
-      return res.status(403).json({
-        success: false,
-        requiresVerification: true,
-        email: user.email,
-        message: 'Please verify your email. A verification code has been sent to your email.'
-      });
-    }
-    console.log('✅ User is verified');
 
     console.log('🔑 Generating token...');
     const token = generateToken(user._id);
@@ -636,14 +427,6 @@ exports.googleAuth = async (req, res) => {
       if (!user.googleId) {
         user.googleId = googleId;
         user.picture = picture;
-        
-        // If user was previously unverified (registered via email), verify them now
-        if (!user.isVerified) {
-          console.log('📧 User was unverified, verifying via Google Sign-In...');
-          user.isVerified = true;
-          user.otp = undefined;
-          user.otpExpiry = undefined;
-        }
         
         // Ensure firstName and lastName are set from name if they don't exist
         if (!user.firstName || !user.lastName) {

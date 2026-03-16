@@ -101,7 +101,7 @@ exports.getAllUsers = async (req, res) => {
 
     // Get all users
     const users = await User.find({})
-      .select('-password -otp -otpExpiry')
+      .select('-password')
       .sort({ createdAt: -1 });
 
     const user_list = users.map(user => ({
@@ -171,7 +171,7 @@ exports.updateUser = async (req, res) => {
       userId,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true }
-    ).select('-password -otp -otpExpiry');
+    ).select('-password');
 
     if (!user) {
       return res.status(404).json({

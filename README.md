@@ -963,6 +963,4 @@ cd backend
 
 **Last Updated:** March 2026
 **Version:** 1.0
-**License:** [To be determined]
-
-For questions or support, refer to the comprehensive documentation in `.github/copilot-instructions.md` or contact the project maintainers.
+**License:** MIT

@@ -57,7 +57,8 @@ Write-Host "[1/5] Checking Gait Analysis Python environment..." -ForegroundColor
 if (-not (Test-Path "gait-analysis\venv")) {
     Write-Host "[WARN] Gait venv not found. Creating it..." -ForegroundColor Yellow
     python -m venv gait-analysis\venv
-    & gait-analysis\venv\Scripts\Activate.ps1
+    $activatePath = Join-Path $PSScriptRoot "gait-analysis\venv\Scripts\Activate.ps1"
+    . $activatePath
     pip install --upgrade pip
     pip install -r gait-analysis\requirements.txt
     Write-Host "[OK] Gait venv created and dependencies installed" -ForegroundColor Green
@@ -71,7 +72,8 @@ Write-Host "[2/5] Checking Therapy Exercises Python environment..." -ForegroundC
 if (-not (Test-Path "therapy-exercises\venv")) {
     Write-Host "[WARN] Therapy venv not found. Creating it..." -ForegroundColor Yellow
     python -m venv therapy-exercises\venv
-    & therapy-exercises\venv\Scripts\Activate.ps1
+    $activatePath = Join-Path $PSScriptRoot "therapy-exercises\venv\Scripts\Activate.ps1"
+    . $activatePath
     pip install --upgrade pip
     pip install -r therapy-exercises\requirements.txt
     Write-Host "[OK] Therapy venv created and dependencies installed" -ForegroundColor Green
@@ -79,7 +81,8 @@ if (-not (Test-Path "therapy-exercises\venv")) {
 } else {
     Write-Host "[OK] Therapy venv found" -ForegroundColor Green
     # Check if XGBoost ML dependencies are installed
-    & therapy-exercises\venv\Scripts\Activate.ps1
+    $activatePath = Join-Path $PSScriptRoot "therapy-exercises\venv\Scripts\Activate.ps1"
+    . $activatePath
     $xgboostCheck = & python -c "import xgboost; print('ok')" 2>&1
     if ($xgboostCheck -notmatch "ok") {
         Write-Host "[WARN] XGBoost ML dependencies missing. Installing..." -ForegroundColor Yellow
@@ -165,20 +168,16 @@ if (Test-Port 5002) {
 Write-Host "[OK] Ports 5000, 5001, and 5002 are available" -ForegroundColor Green
 Write-Host ""
 
-# Start services
+# Start all services as background jobs
 Write-Host "[5/5] Starting services..." -ForegroundColor Yellow
 Write-Host ""
 
-# Start Python Flask service
+# Start Python Gait Analysis (port 5001)
 Write-Host "  -> Starting Python Gait Analysis Service (Port 5001)..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
-Write-Host 'Python Gait Analysis Service' -ForegroundColor Cyan
-Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
-Write-Host ''
-Set-Location -Path '$currentDir\gait-analysis'
-& '.\venv\Scripts\Activate.ps1'
-& python app.py
-"@ -WindowStyle Normal
+$gaitJob = Start-Job -ScriptBlock {
+    Set-Location "E:\VSC\CVAPed Mobile\backend\gait-analysis"
+    & "E:\VSC\CVAPed Mobile\backend\gait-analysis\venv\Scripts\python.exe" app.py
+}
 
 Start-Sleep -Seconds 3
 
@@ -190,16 +189,12 @@ if (Test-Port 5001) {
 }
 Write-Host ""
 
-# Start Python Exercise Recommendation service
+# Start Python Exercise Recommendation service (port 5002)
 Write-Host "  -> Starting Python Therapy & Exercise Service (Port 5002)..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
-Write-Host 'Python Therapy & Exercise Recommendation Service' -ForegroundColor Cyan
-Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
-Write-Host ''
-Set-Location -Path '$currentDir\therapy-exercises'
-& '.\venv\Scripts\Activate.ps1'
-& python app.py
-"@ -WindowStyle Normal
+$therapyJob = Start-Job -ScriptBlock {
+    Set-Location "E:\VSC\CVAPed Mobile\backend\therapy-exercises"
+    & "E:\VSC\CVAPed Mobile\backend\therapy-exercises\venv\Scripts\python.exe" app.py
+}
 
 Start-Sleep -Seconds 3
 
@@ -211,15 +206,12 @@ if (Test-Port 5002) {
 }
 Write-Host ""
 
-# Start Node.js Express server
+# Start Node.js Express server (port 5000)
 Write-Host "  -> Starting Node.js API Server (Port 5000)..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
-Write-Host 'Node.js API Server' -ForegroundColor Cyan
-Write-Host 'Press Ctrl+C to stop' -ForegroundColor Gray
-Write-Host ''
-Set-Location -Path '$currentDir'
-npm run dev
-"@ -WindowStyle Normal
+$nodeJob = Start-Job -ScriptBlock {
+    Set-Location "E:\VSC\CVAPed Mobile\backend"
+    npm run dev
+}
 
 Start-Sleep -Seconds 3
 
@@ -236,32 +228,10 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "  All Services Running!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Services are running in separate PowerShell windows:" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  [1] Node.js API Server" -ForegroundColor White
-Write-Host "     Local: http://localhost:5000" -ForegroundColor Gray
-Write-Host "     Network: http://${localIP}:5000" -ForegroundColor Gray
-Write-Host ""
-Write-Host "  [2] Python Gait Analysis" -ForegroundColor White
-Write-Host "     Local: http://localhost:5001" -ForegroundColor Gray
-Write-Host "     Network: http://${localIP}:5001" -ForegroundColor Gray
-Write-Host ""
-Write-Host "  [3] Python Therapy & Exercise Service" -ForegroundColor White
-Write-Host "     Local: http://localhost:5002" -ForegroundColor Gray
-Write-Host "     Network: http://${localIP}:5002" -ForegroundColor Gray
-Write-Host "     Services: Speech Therapy + Stroke Exercise + XGBoost ML Predictions" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "Quick Tests:" -ForegroundColor Yellow
-Write-Host "  curl http://localhost:5000/api/gait/health" -ForegroundColor Gray
-Write-Host "  curl http://localhost:5001/health" -ForegroundColor Gray
-Write-Host "  curl http://localhost:5002/api/therapy/health" -ForegroundColor Gray
-Write-Host "  curl http://localhost:5002/api/exercises/health" -ForegroundColor Gray
-Write-Host "  curl http://localhost:5002/api/articulation/model-status" -ForegroundColor Gray
-Write-Host ""
-Write-Host "Mobile App Configuration:" -ForegroundColor Yellow
-Write-Host "  Main API: http://${localIP}:5000" -ForegroundColor White
-Write-Host "  Gait Analysis: http://${localIP}:5001" -ForegroundColor White
-Write-Host "  Therapy & Exercises: http://${localIP}:5002" -ForegroundColor White
-Write-Host ""
-Write-Host "Press Ctrl+C in each window to stop the services" -ForegroundColor DarkGray
-Write-Host ""
+Write-Host "Press any key to stop all services..." -ForegroundColor Yellow
+$null = $Host.UI.ReadKey("NoEcho,IncludeKeyDown")
+
+Write-Host "Stopping services..." -ForegroundColor Yellow
+Stop-Job $nodeJob, $gaitJob, $therapyJob -ErrorAction SilentlyContinue
+Remove-Job $nodeJob, $gaitJob, $therapyJob -ErrorAction SilentlyContinue
+Write-Host "All services stopped." -ForegroundColor Green

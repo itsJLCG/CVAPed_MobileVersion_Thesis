@@ -4,12 +4,11 @@ const { body } = require('express-validator');
 const {
   register,
   login,
-  verifyOTP,
-  resendOTP,
   getMe,
   updateProfile,
   googleAuth,
-  completeProfile
+  completeProfile,
+  updateDiagnosticStatus
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -30,13 +29,12 @@ const loginValidation = [
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
-router.post('/verify-otp', verifyOTP);
-router.post('/resend-otp', resendOTP);
 router.post('/google', googleAuth);
 
 // Protected routes
 router.get('/me', protect, getMe);
 router.put('/updateprofile', protect, updateProfile);
+router.put('/diagnostic-status', protect, updateDiagnosticStatus);
 router.post('/complete-profile', protect, completeProfile);
 
 module.exports = router;

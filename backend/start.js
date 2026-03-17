@@ -3,6 +3,17 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EBADF' || err.message?.includes('not a socket')) {
+    return;
+  }
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
 const backendDir = __dirname;
 
 console.log('\n========================================');
@@ -65,23 +76,19 @@ console.log('Make sure your .env URLs match this IP!\n');
 if (fs.existsSync('.env')) {
   const envContent = fs.readFileSync('.env', 'utf8');
   
-  const gaitMatch = envContent.match(/GAIT_ANALYSIS_URL=(.+)/);
-  if (gaitMatch) {
-    const gaitUrl = gaitMatch[1].trim();
-    console.log('Current GAIT_ANALYSIS_URL:', gaitUrl);
-    if (gaitUrl.includes('localhost')) {
-      console.log('[WARN] Using localhost won\'t work on mobile devices!');
-      console.log('  Update .env to: GAIT_ANALYSIS_URL=http://' + localIP + ':5001');
-    }
-  }
+  const envVars = [
+    { key: 'GAIT_ANALYSIS_URL', match: envContent.match(/GAIT_ANALYSIS_URL=(.+)/), port: 5001 },
+    { key: 'THERAPY_URL', match: envContent.match(/THERAPY_URL=(.+)/), port: 5002 },
+  ];
   
-  const therapyMatch = envContent.match(/THERAPY_URL=(.+)/);
-  if (therapyMatch) {
-    const therapyUrl = therapyMatch[1].trim();
-    console.log('Current THERAPY_URL:', therapyUrl);
-    if (therapyUrl.includes('localhost')) {
-      console.log('[WARN] Using localhost won\'t work on mobile devices!');
-      console.log('  Update .env to: THERAPY_URL=http://' + localIP + ':5002');
+  for (const { key, match, port } of envVars) {
+    if (match) {
+      const url = match[1].trim();
+      console.log('Current ' + key + ':', url);
+      if (url.includes('localhost')) {
+        console.log('[WARN] Using localhost won\'t work on mobile devices!');
+        console.log('  Update .env to: ' + key + '=http://' + localIP + ':' + port);
+      }
     }
   }
   console.log('');
@@ -207,6 +214,18 @@ const services = [
 async function startServices() {
   console.log('[5/5] Starting services...\n');
   
+  const isWindows = process.platform === 'win32';
+  const spawnOpts = isWindows ? { 
+    cwd: backendDir, 
+    stdio: 'inherit',
+    detached: false,
+    windowsHide: true
+  } : { 
+    cwd: backendDir, 
+    stdio: 'inherit',
+    detached: true
+  };
+  
   const ps = services.map(s => {
     console.log('  -> Starting ' + s.name + ' (Port ' + s.port + ')...');
     
@@ -214,42 +233,83 @@ async function startServices() {
       const venvScripts = path.join(s.venv, 'Scripts');
       const appPath = path.join(s.cwd, 'app.py');
       
-      // Set PATH to include venv Scripts folder
-      const env = { ...process.env, PATH: venvScripts + path.delimiter + process.env.PATH };
+      const env = { 
+        ...process.env, 
+        PATH: venvScripts + path.delimiter + process.env.PATH,
+        PYTHONUNBUFFERED: '1',
+        FLASK_ENV: 'production'
+      };
       
-      return spawn('python', [appPath], {
+      const port = s.port;
+      const patch = `
+import sys, os
+sys.path.insert(0, r'${appPath.replace(/\\/g, '\\\\')}')
+import app as _app
+_run = _app.app.run
+def patched_run(*a, **kw):
+    kw.setdefault('threaded', False)
+    kw.setdefault('use_reloader', False)
+    kw.setdefault('debug', False)
+    kw.setdefault('host', '0.0.0.0')
+    kw.setdefault('port', ${port})
+    _run(*a, **kw)
+_app.app.run = patched_run
+_app.app.run()
+`;
+      
+      return spawn('python', ['-c', patch], {
         cwd: s.cwd,
         env: env,
-        stdio: 'inherit'
+        stdio: 'inherit',
+        detached: false,
+        windowsHide: true
       });
     }
     
     return spawn('npm', ['run', 'dev'], {
       cwd: s.cwd,
       shell: true,
-      stdio: 'inherit'
+      stdio: 'inherit',
+      windowsHide: true
     });
   });
 
   await new Promise(resolve => setTimeout(resolve, 3000));
   
+  const servicesInfo = [
+    { name: 'Node API', port: 5000 },
+    { name: 'Gait Analysis', port: 5001 },
+    { name: 'Therapy', port: 5002 },
+  ];
+  
   console.log('\n========================================');
   console.log('  All Services Running!');
   console.log('========================================');
-  console.log('\n  Node.js API:      http://localhost:5000');
-  console.log('  Gait Analysis:   http://localhost:5001');
-  console.log('  Therapy:         http://localhost:5002');
+  for (const s of servicesInfo) {
+    console.log('  ' + s.name + ':       http://localhost:' + s.port);
+  }
   console.log('\n  Network IPs:');
-  console.log('    http://' + localIP + ':5000');
-  console.log('    http://' + localIP + ':5001');
-  console.log('    http://' + localIP + ':5002');
+  for (const s of servicesInfo) {
+    console.log('    http://' + localIP + ':' + s.port);
+  }
   console.log('\nPress Ctrl+C to stop all services\n');
 
-  process.on('SIGINT', () => {
+  const cleanup = () => {
     console.log('\nStopping services...');
-    ps.forEach(p => p.kill());
-    process.exit();
-  });
+    
+    ps.forEach(p => {
+      try {
+        p.kill('SIGTERM');
+      } catch {}
+    });
+    
+    setTimeout(() => {
+      process.exit(0);
+    }, 500);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 }
 
 async function main() {

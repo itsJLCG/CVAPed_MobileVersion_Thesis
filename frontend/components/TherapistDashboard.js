@@ -2790,8 +2790,6 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   };
 
   const renderSuccessStoriesTab = () => {
-    const API_URL = 'http://10.0.2.2:5000'; // For Android emulator
-    
     const truncateText = (text, maxLength = 80) => {
       if (!text) return '';
       return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;

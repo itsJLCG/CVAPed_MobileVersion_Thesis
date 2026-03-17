@@ -1,32 +1,28 @@
-const BASE_IP = '192.168.0.47'; // Your network IP for physical device
+const BASE_IP = process.env.EXPO_PUBLIC_API_URL 
+  ? process.env.EXPO_PUBLIC_API_URL.replace('/api', '').replace('http://', '').replace('https://', '')
+  : '192.168.0.47';
 
-// Port Configuration (matches backend .env)
 const PORTS = {
-  MAIN_API: 5000,        // Node.js backend (auth, users)
-  GAIT_ANALYSIS: 5001,   // Python Flask - Gait Analysis
-  THERAPY: 5002,         // Python Flask - Therapy Exercises
+  MAIN_API: process.env.EXPO_PUBLIC_API_URL ? 5000 : 5000,
+  GAIT_ANALYSIS: process.env.EXPO_PUBLIC_GAIT_API_URL ? 5001 : 5001,
+  THERAPY: process.env.EXPO_PUBLIC_THERAPY_API_URL ? 5002 : 5002,
 };
 
-// Constructed API URLs
+const MAIN_API_URL = process.env.EXPO_PUBLIC_API_URL || `http://${BASE_IP}:${PORTS.MAIN_API}/api`;
+const GAIT_API_URL = process.env.EXPO_PUBLIC_GAIT_API_URL || `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`;
+const THERAPY_API_URL = process.env.EXPO_PUBLIC_THERAPY_API_URL || `http://${BASE_IP}:${PORTS.THERAPY}`;
+
 export const API_CONFIG = {
   BASE_IP,
-  
-  // Main Node.js backend
-  MAIN_API_URL: `http://${BASE_IP}:${PORTS.MAIN_API}/api`,
-  
-  // Gait Analysis service
-  GAIT_API_URL: `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`,
-  
-  // Therapy Exercises service
-  THERAPY_API_URL: `http://${BASE_IP}:${PORTS.THERAPY}`,
+  MAIN_API_URL,
+  GAIT_API_URL,
+  THERAPY_API_URL,
 };
 
-// Export individual URLs for convenience
-export const API_URL = `http://${BASE_IP}:${PORTS.MAIN_API}/api`;
-export const GAIT_API_URL = `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`;
-export const THERAPY_API_URL = `http://${BASE_IP}:${PORTS.THERAPY}`;
+export const API_URL = MAIN_API_URL;
+export const GAIT_API_URL = GAIT_API_URL;
+export const THERAPY_API_URL = THERAPY_API_URL;
 
-// For debugging - log the current configuration
 console.log('📡 API Configuration:', {
   'Main API': API_CONFIG.MAIN_API_URL,
   'Gait Analysis': API_CONFIG.GAIT_API_URL,

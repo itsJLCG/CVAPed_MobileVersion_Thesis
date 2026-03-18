@@ -9,8 +9,10 @@ dotenv.config();
 const app = express();
 
 // Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Gait analysis requests can contain large sensor arrays, so use a
+// higher payload limit than the Express default.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Enable CORS
 app.use(cors());

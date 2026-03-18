@@ -14,7 +14,7 @@ import LanguageTherapyScreen from './speech/LanguageTherapyScreen';
 
 const { width } = Dimensions.get('window');
 
-const SpeechTherapyScreen = ({ onBack }) => {
+const SpeechTherapyScreen = ({ onBack, initialTherapyType = null }) => {
   console.log('SpeechTherapyScreen rendered');
   
   const [selectedTherapy, setSelectedTherapy] = useState(null);
@@ -53,11 +53,21 @@ const SpeechTherapyScreen = ({ onBack }) => {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    if (initialTherapyType === 'articulation' || initialTherapyType === 'language') {
+      setSelectedTherapy(initialTherapyType);
+    }
+  }, [initialTherapyType]);
+
   const handleBeginAssessment = (therapyType) => {
     setSelectedTherapy(therapyType);
   };
 
   const handleBackFromTherapy = () => {
+    if (initialTherapyType && onBack) {
+      onBack();
+      return;
+    }
     setSelectedTherapy(null);
   };
 

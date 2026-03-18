@@ -20,7 +20,7 @@ import BottomNav from './BottomNav';
 
 const { width, height } = Dimensions.get('window');
 
-const TherapyScreen = ({ onBack, onNavigate }) => {
+const TherapyScreen = ({ onBack, onNavigate, initialTherapyType = null }) => {
   const [selectedTherapy, setSelectedTherapy] = useState(null);
   const [activeTab, setActiveTab] = useState('therapy');
   const [showPhysicalTherapy, setShowPhysicalTherapy] = useState(false);
@@ -57,6 +57,17 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
     };
     checkDiagnosticStatus();
   }, []);
+
+  useEffect(() => {
+    if (initialTherapyType === 'physical') {
+      setShowPhysicalTherapy(true);
+      return;
+    }
+
+    if (initialTherapyType === 'articulation' || initialTherapyType === 'language' || initialTherapyType === 'fluency') {
+      setShowSpeechTherapy(true);
+    }
+  }, [initialTherapyType]);
 
   const handleDiagnosticConfirm = async (hasVisited) => {
     setDiagnosticLoading(true);
@@ -142,10 +153,20 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
   };
 
   const handleBackFromPhysicalTherapy = () => {
+    if (initialTherapyType === 'physical' && onBack) {
+      setShowPhysicalTherapy(false);
+      onBack();
+      return;
+    }
     setShowPhysicalTherapy(false);
   };
 
   const handleBackFromSpeechTherapy = () => {
+    if ((initialTherapyType === 'articulation' || initialTherapyType === 'language' || initialTherapyType === 'fluency') && onBack) {
+      setShowSpeechTherapy(false);
+      onBack();
+      return;
+    }
     setShowSpeechTherapy(false);
   };
 
@@ -169,7 +190,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
 
   // Show Speech Therapy screen if selected
   if (showSpeechTherapy) {
-    return <SpeechTherapyScreen onBack={handleBackFromSpeechTherapy} />;
+    return <SpeechTherapyScreen onBack={handleBackFromSpeechTherapy} initialTherapyType={initialTherapyType} />;
   }
 
   return (

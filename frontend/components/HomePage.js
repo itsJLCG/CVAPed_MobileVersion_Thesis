@@ -25,6 +25,7 @@ const { width, height } = Dimensions.get('window');
 const HomePage = ({ userData, onLogout }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home', 'therapy', 'profile', 'health', 'story-detail'
+  const [selectedHomeTherapy, setSelectedHomeTherapy] = useState(null);
   const scrollViewRef = useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [successStories, setSuccessStories] = useState([]);
@@ -119,6 +120,7 @@ const HomePage = ({ userData, onLogout }) => {
   };
 
   const handleTherapyBack = () => {
+    setSelectedHomeTherapy(null);
     setCurrentScreen('home');
     setActiveTab('home');
   };
@@ -155,11 +157,15 @@ const HomePage = ({ userData, onLogout }) => {
 
   const handleNavigateFromTherapy = (destination) => {
     console.log('Navigating from therapy to:', destination);
+    if (destination !== 'therapy') {
+      setSelectedHomeTherapy(null);
+    }
     setActiveTab(destination);
     setCurrentScreen(destination);
   };
 
-  const handleTherapyCardPress = () => {
+  const handleTherapyCardPress = (therapyType = null) => {
+    setSelectedHomeTherapy(therapyType);
     setActiveTab('therapy');
     setCurrentScreen('therapy');
   };
@@ -205,7 +211,11 @@ const HomePage = ({ userData, onLogout }) => {
     console.log('🏥 Rendering HealthScreen component');
     return (
       <View style={styles.container}>
-        <HealthScreen onBack={handleHealthBack} />
+        <HealthScreen
+          onBack={handleHealthBack}
+          onOpenPredictions={() => setCurrentScreen('predictions')}
+          onOpenPlan={() => setCurrentScreen('prescriptive')}
+        />
         <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
     );
@@ -216,7 +226,7 @@ const HomePage = ({ userData, onLogout }) => {
     return (
       <View style={styles.container}>
         <PredictionsScreen onBack={handlePredictionsBack} />
-        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+        <BottomNav activeTab="health" onTabPress={handleTabPress} />
       </View>
     );
   }
@@ -226,7 +236,7 @@ const HomePage = ({ userData, onLogout }) => {
     return (
       <View style={styles.container}>
         <PrescriptiveScreen onBack={handlePrescriptiveBack} />
-        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
+        <BottomNav activeTab="health" onTabPress={handleTabPress} />
       </View>
     );
   }
@@ -243,7 +253,7 @@ const HomePage = ({ userData, onLogout }) => {
 
   // Show Therapy screen if therapy tab is active
   if (currentScreen === 'therapy') {
-    return <TherapyScreen onBack={handleTherapyBack} onNavigate={handleNavigateFromTherapy} />;
+    return <TherapyScreen onBack={handleTherapyBack} onNavigate={handleNavigateFromTherapy} initialTherapyType={selectedHomeTherapy} />;
   }
 
   // Show Success Story Detail screen
@@ -266,7 +276,7 @@ const HomePage = ({ userData, onLogout }) => {
     {
       key: 'language',
       title: 'Language',
-      subtitle: 'Strengthen comprehension and expressive communication.',
+      subtitle: 'Improve language skills with guided exercises.',
       accent: '#1ea896',
       icon: 'chatbubbles',
       badge: 'PEDIATRIC',
@@ -282,9 +292,38 @@ const HomePage = ({ userData, onLogout }) => {
       duration: '20-25 min'
     }
   ];
+  const recoveryHighlights = [
+    {
+      key: 'focus',
+      label: 'Today\'s Focus',
+      value: 'Steady daily practice',
+      icon: 'sparkles',
+      tone: '#fff1f2'
+    },
+    {
+      key: 'appointments',
+      label: 'Next Step',
+      value: 'Check appointments',
+      icon: 'calendar-clear',
+      tone: '#eff6ff'
+    },
+    {
+      key: 'stories',
+      label: 'Motivation',
+      value: `${featuredStories.length || 0} inspiring stories`,
+      icon: 'heart',
+      tone: '#ecfeff'
+    }
+  ];
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft} />
+        <Text style={styles.headerTitle}>Home</Text>
+        <View style={styles.headerRight} />
+      </View>
+
       <ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -300,80 +339,62 @@ const HomePage = ({ userData, onLogout }) => {
             ]}
           >
             <View style={styles.heroShell}>
-              <View style={styles.heroGlowLarge} />
-              <View style={styles.heroGlowSmall} />
-              <View style={styles.heroTextColumn}>
-                <View style={styles.heroEyebrowRow}>
-                  <Text style={styles.heroEyebrow}>Daily recovery space</Text>
-                  <View style={styles.heroStatusPill}>
-                    <Ionicons name="sparkles" size={11} color="#fff7ed" />
-                    <Text style={styles.heroStatusText}>Care plan ready</Text>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroWordmarkRow}>
+                  <View style={styles.heroLogoPill}>
+                    <Image
+                      source={require('../assets/cvalogonotext.png')}
+                      style={styles.heroLogoPillIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.heroEyebrow}>Daily recovery space</Text>
+                    <Text style={styles.heroMicrocopy}>Your therapy home for small wins that add up.</Text>
                   </View>
                 </View>
-                <Text style={styles.heroTitle}>Welcome back, {firstName}</Text>
-                <Text style={styles.heroSubtitle}>
-                  Continue therapy, check your care tools, and stay inspired by patient success stories.
-                </Text>
-
-                <View style={styles.heroInsightCard}>
-                  <View style={styles.heroInsightIconWrap}>
-                    <Ionicons name="pulse" size={16} color="#a61e22" />
-                  </View>
-                  <View style={styles.heroInsightTextWrap}>
-                    <Text style={styles.heroInsightTitle}>A short session today keeps momentum strong</Text>
-                    <Text style={styles.heroInsightText}>Open therapy or review your appointments in one tap.</Text>
-                  </View>
-                </View>
-
-                <View style={styles.heroActionRow}>
-                  <TouchableOpacity style={styles.heroPrimaryButton} onPress={handleTherapyCardPress} activeOpacity={0.85}>
-                    <Text style={styles.heroPrimaryButtonText}>Start Therapy</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#a61e22" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.heroGhostButton} onPress={handleAppointmentsPress} activeOpacity={0.85}>
-                    <Ionicons name="calendar-clear" size={15} color="#FFFFFF" />
-                    <Text style={styles.heroGhostButtonText}>Appointments</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.heroStatsRow}>
-                  <View style={styles.heroStatChip}>
-                    <Text style={styles.heroStatValue}>4</Text>
-                    <Text style={styles.heroStatLabel}>Programs</Text>
-                  </View>
-                  <View style={styles.heroStatChip}>
-                    <Text style={styles.heroStatValue}>{successStories.length}</Text>
-                    <Text style={styles.heroStatLabel}>Stories</Text>
-                  </View>
-                  <View style={styles.heroStatChip}>
-                    <Text style={styles.heroStatValue}>24/7</Text>
-                    <Text style={styles.heroStatLabel}>Access</Text>
-                  </View>
+                <View style={styles.heroStatusPillAlt}>
+                  <Ionicons name="sparkles" size={11} color="#b42318" />
+                  <Text style={styles.heroStatusTextAlt}>Ready today</Text>
                 </View>
               </View>
 
-              <View style={styles.heroBrandCard}>
-                <View style={styles.heroBrandBadge}>
-                  <Text style={styles.heroBrandBadgeText}>CVAPed</Text>
+              <Text style={styles.heroTitle}>Welcome back, {firstName}</Text>
+              <Text style={styles.heroSubtitle}>
+                Start a focused session, check your appointments, and stay inspired by recovery stories from the community.
+              </Text>
+
+              <View style={styles.heroFocusPanel}>
+                <View style={styles.heroFocusLeft}>
+                  <Text style={styles.heroFocusLabel}>Today&apos;s rhythm</Text>
+                  <Text style={styles.heroFocusValue}>Practice a little. Progress a lot.</Text>
                 </View>
-                <View style={styles.logoIconWrapper}>
-                  <Image 
-                    source={require('../assets/cvalogonotext.png')} 
-                    style={styles.logoIcon}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={styles.logoTextWrapper}>
-                  <Image 
-                    source={require('../assets/CVAPed_Text.png')} 
-                    style={styles.logoText}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.heroBrandCaption}>Personalized therapy support for every recovery step.</Text>
+              </View>
+
+              <View style={styles.heroActionRow}>
+                <TouchableOpacity style={styles.heroPrimaryButton} onPress={() => handleTherapyCardPress()} activeOpacity={0.85}>
+                  <Text style={styles.heroPrimaryButtonText}>Start Therapy</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
             </View>
           </Animated.View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.recoveryRibbon}>
+            {recoveryHighlights.map((item) => (
+              <View key={item.key} style={[styles.recoveryPill, { backgroundColor: item.tone }]}>
+                <View style={styles.recoveryPillIconWrap}>
+                  <Ionicons name={item.icon} size={16} color="#a61e22" />
+                </View>
+                <View style={styles.recoveryPillTextWrap}>
+                  <Text style={styles.recoveryPillLabel}>{item.label}</Text>
+                  <Text style={styles.recoveryPillValue}>{item.value}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={styles.section}> 
@@ -381,12 +402,21 @@ const HomePage = ({ userData, onLogout }) => {
             <View style={styles.sectionHeaderRow}>
               <View>
                 <Text style={styles.sectionTitle}>Quick Access</Text>
-                <Text style={styles.sectionCaption}>Everything you need for today's care plan.</Text>
+                <Text style={styles.sectionCaption}>A streamlined command center for recovery, scheduling, and progress.</Text>
               </View>
               <View style={styles.panelBadge}>
                 <Ionicons name="flash" size={12} color="#b45309" />
                 <Text style={styles.panelBadgeText}>Ready</Text>
               </View>
+            </View>
+
+            <View style={styles.quickAccessLeadCard}>
+              <View style={styles.quickAccessLeadHeader}>
+                <Text style={styles.quickAccessLeadEyebrow}>Recovery flow</Text>
+                <Ionicons name="arrow-forward-circle" size={18} color="#a61e22" />
+              </View>
+              <Text style={styles.quickAccessLeadTitle}>Everything you need is organized for calm, focused progress.</Text>
+              <Text style={styles.quickAccessLeadText}>Move between therapy, appointments, and progress review without hunting through the app.</Text>
             </View>
 
             <View style={styles.quickAccessRow}>
@@ -417,7 +447,7 @@ const HomePage = ({ userData, onLogout }) => {
               <Text style={styles.sectionTitle}>Therapy Programs</Text>
               <Text style={styles.sectionCaption}>Choose a guided activity that matches today's goal.</Text>
             </View>
-            <TouchableOpacity onPress={handleTherapyCardPress} activeOpacity={0.8}>
+            <TouchableOpacity onPress={() => handleTherapyCardPress()} activeOpacity={0.8}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
@@ -428,21 +458,26 @@ const HomePage = ({ userData, onLogout }) => {
                 <Animated.View key={program.key} style={{ opacity: animStyle, transform: [{ scale: animStyle }], width: index === 2 ? '100%' : '48%' }}>
                   <TouchableOpacity 
                     style={[styles.quickActionCard, index === 2 && styles.quickActionCardWide]}
-                    onPress={handleTherapyCardPress}
+                    onPress={() => handleTherapyCardPress(program.key)}
                     activeOpacity={0.85}
                   >
                     <View style={[styles.cardGradient, { backgroundColor: program.accent }]}> 
+                      <View style={styles.programHalo} />
                       <View style={styles.cardBadge}>
                         <Text style={styles.cardBadgeText}>{program.badge}</Text>
                       </View>
                       <View style={styles.cardIconContainer}>
                         <Ionicons name={program.icon} size={32} color="#FFFFFF" />
                       </View>
-                      <Text style={styles.quickActionText}>{program.title}</Text>
+                      <Text style={[styles.quickActionText, program.key === 'language' && styles.quickActionTextCompact]}>{program.title}</Text>
                       <Text style={styles.quickActionSubtext}>{program.subtitle}</Text>
                       <View style={styles.cardFooter}>
                         <Ionicons name="time-outline" size={14} color="#FFFFFF" />
                         <Text style={styles.cardFooterText}>{program.duration}</Text>
+                      </View>
+                      <View style={styles.programCTA}>
+                        <Text style={styles.programCTAText}>Open program</Text>
+                        <Ionicons name="arrow-forward" size={14} color="#ffffff" />
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -471,6 +506,7 @@ const HomePage = ({ userData, onLogout }) => {
           ) : featuredStories.length > 0 ? (
             <View style={styles.storyCarouselShell}>
               <View style={styles.storyCarouselFrame}>
+              <View style={styles.storyRailAccent} />
               <ScrollView
                 ref={scrollViewRef}
                 horizontal
@@ -549,7 +585,7 @@ const HomePage = ({ userData, onLogout }) => {
             </Text>
             <TouchableOpacity 
               style={styles.ctaButton}
-              onPress={handleTherapyCardPress}
+              onPress={() => handleTherapyCardPress()}
               activeOpacity={0.9}
             >
               <Text style={styles.ctaButtonText}>Begin Therapy</Text>
@@ -597,231 +633,165 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  headerLeft: {
+    width: 34,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  headerRight: {
+    width: 34,
+  },
   
   topNavbar: {
-    backgroundColor: '#a61e22',
+    backgroundColor: '#f6f7fb',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   navContent: {
     paddingVertical: 6,
   },
   heroShell: {
-    backgroundColor: '#c9302c',
-    borderRadius: 28,
-    padding: 18,
-    flexDirection: 'row',
-    gap: 14,
+    backgroundColor: '#fffaf8',
+    borderRadius: 30,
+    padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    overflow: 'hidden',
-    position: 'relative',
+    borderColor: '#f8d7d3',
+    shadowColor: '#7f1d1d',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 3,
   },
-  heroGlowLarge: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -70,
-    right: -40,
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  heroGlowSmall: {
-    position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    bottom: -24,
-    left: -20,
-  },
-  heroTextColumn: {
-    flex: 1,
-    zIndex: 1,
-  },
-  heroEyebrowRow: {
+  heroWordmarkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 10,
   },
+  heroLogoPill: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f5d6d2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroLogoPillIcon: {
+    width: 82,
+    height: 82,
+  },
   heroEyebrow: {
-    color: '#ffd9d9',
+    color: '#8f1d21',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  heroStatusPill: {
+  heroMicrocopy: {
+    color: '#7a6a67',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  heroStatusPillAlt: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#feeceb',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
-  heroStatusText: {
-    color: '#fff4ec',
+  heroStatusTextAlt: {
+    color: '#b42318',
     fontSize: 10,
     fontWeight: '800',
   },
   heroTitle: {
-    color: '#ffffff',
-    fontSize: 28,
+    color: '#201a19',
+    fontSize: 30,
     fontWeight: '800',
-    marginTop: 8,
+    marginTop: 18,
   },
   heroSubtitle: {
-    color: '#ffeaea',
+    color: '#6f6360',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 10,
-    maxWidth: 240,
+    maxWidth: 290,
   },
-  heroInsightCard: {
-    marginTop: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 18,
-    padding: 12,
+  heroFocusPanel: {
+    marginTop: 18,
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'stretch',
+    backgroundColor: '#fff1ee',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: '#f5d3cd',
+    overflow: 'hidden',
   },
-  heroInsightIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: '#fff4ef',
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroFocusLeft: {
+    flex: 1.2,
+    padding: 16,
   },
-  heroInsightTextWrap: {
-    flex: 1,
-  },
-  heroInsightTitle: {
-    color: '#ffffff',
-    fontSize: 13,
+  heroFocusLabel: {
+    color: '#b42318',
+    fontSize: 10,
     fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  heroInsightText: {
-    color: '#ffe0df',
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 3,
+  heroFocusValue: {
+    color: '#201a19',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
+    marginTop: 8,
   },
   heroActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 16,
+    marginTop: 18,
   },
   heroPrimaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fff3f1',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    backgroundColor: '#b42318',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 999,
   },
   heroPrimaryButtonText: {
-    color: '#a61e22',
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
-  },
-  heroGhostButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.26)',
-  },
-  heroGhostButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  heroStatsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-  },
-  heroStatChip: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 74,
-  },
-  heroStatValue: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  heroStatLabel: {
-    color: '#ffdede',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  heroBrandCard: {
-    width: 112,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    padding: 12,
-    justifyContent: 'flex-start',
-    zIndex: 1,
-  },
-  heroBrandBadge: {
-    alignSelf: 'stretch',
-    borderRadius: 999,
-    paddingVertical: 5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 10,
-  },
-  heroBrandBadgeText: {
-    textAlign: 'center',
-    color: '#fff4ec',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  logoIconWrapper: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
-  },
-  logoIcon: {
-    width: 130,
-    height: 130,
-  },
-  logoTextWrapper: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  logoText: {
-    width: 82,
-    height: 24,
-  },
-  heroBrandCaption: {
-    color: '#fff0f0',
-    fontSize: 10,
-    lineHeight: 14,
-    textAlign: 'center',
-    marginTop: 10,
   },
   content: {
     flex: 1,
@@ -840,6 +810,42 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
     marginBottom: 12,
+  },
+  recoveryRibbon: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  recoveryPill: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  recoveryPillIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  recoveryPillTextWrap: {
+    gap: 4,
+  },
+  recoveryPillLabel: {
+    color: '#7f1d1d',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  recoveryPillValue: {
+    color: '#111827',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   sectionTitle: {
     fontSize: 22,
@@ -862,6 +868,39 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#ffd9cd',
+  },
+  quickAccessLeadCard: {
+    backgroundColor: '#fffdfb',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#ffe4d6',
+    marginBottom: 12,
+  },
+  quickAccessLeadHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  quickAccessLeadEyebrow: {
+    color: '#b45309',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  quickAccessLeadTitle: {
+    color: '#1f2937',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
+  },
+  quickAccessLeadText: {
+    color: '#6b7280',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
   },
   panelBadge: {
     flexDirection: 'row',
@@ -936,6 +975,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18,
     justifyContent: 'space-between',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  programHalo: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    top: -46,
+    right: -28,
   },
   cardBadge: {
     alignSelf: 'flex-start',
@@ -963,6 +1013,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     marginTop: 18,
+    lineHeight: 24,
+    minHeight: 48,
+  },
+  quickActionTextCompact: {
+    fontSize: 18,
+    lineHeight: 24,
   },
   quickActionSubtext: {
     color: 'rgba(255,255,255,0.92)',
@@ -988,6 +1044,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  programCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+  },
+  programCTAText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   storyLoadingCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -1006,6 +1074,16 @@ const styles = StyleSheet.create({
   },
   storyCarouselFrame: {
     paddingVertical: 4,
+    position: 'relative',
+  },
+  storyRailAccent: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: 22,
+    height: 190,
+    borderRadius: 28,
+    backgroundColor: '#fdecec',
   },
   storyCarouselSlide: {
     width,

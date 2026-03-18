@@ -22,6 +22,8 @@ import {
 } from 'expo-sensors';
 import gaitAnalysisAPI from '../../services/gaitApi';
 
+const MAX_SENSOR_SAMPLES = 1200;
+
 const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -50,6 +52,15 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   const deviceMotionSubscription = useRef(null);
   const pedometerSubscription = useRef(null);
   const timerInterval = useRef(null);
+
+  const downsampleSensorSeries = (samples, limit = MAX_SENSOR_SAMPLES) => {
+    if (!Array.isArray(samples) || samples.length <= limit) {
+      return samples;
+    }
+
+    const step = Math.ceil(samples.length / limit);
+    return samples.filter((_, index) => index % step === 0).slice(0, limit);
+  };
 
   // Pulse animation for recording button
   useEffect(() => {
@@ -318,12 +329,18 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       console.log('Recording duration:', recordingTime, 'seconds');
       
       // Prepare data for backend - match the Python backend format
+      const trimmedAccelerometer = downsampleSensorSeries(sensorData.accelerometer);
+      const trimmedGyroscope = downsampleSensorSeries(sensorData.gyroscope);
+      const trimmedMagnetometer = downsampleSensorSeries(sensorData.magnetometer);
+      const trimmedBarometer = downsampleSensorSeries(sensorData.barometer);
+      const trimmedDeviceMotion = downsampleSensorSeries(sensorData.deviceMotion);
+
       const requestData = {
-        accelerometer: sensorData.accelerometer,
-        gyroscope: sensorData.gyroscope,
-        magnetometer: sensorData.magnetometer.length > 0 ? sensorData.magnetometer : undefined,
-        barometer: sensorData.barometer.length > 0 ? sensorData.barometer : undefined,
-        deviceMotion: sensorData.deviceMotion.length > 0 ? sensorData.deviceMotion : undefined,
+        accelerometer: trimmedAccelerometer,
+        gyroscope: trimmedGyroscope,
+        magnetometer: trimmedMagnetometer.length > 0 ? trimmedMagnetometer : undefined,
+        barometer: trimmedBarometer.length > 0 ? trimmedBarometer : undefined,
+        deviceMotion: trimmedDeviceMotion.length > 0 ? trimmedDeviceMotion : undefined,
         pedometer: pedometerData.steps > 0 ? {
           steps: pedometerData.steps,
           startTime: pedometerData.start,
@@ -340,6 +357,12 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
         deviceMotion_samples: requestData.deviceMotion?.length || 0,
         pedometer_steps: requestData.pedometer?.steps || 0,
         session_id: requestData.session_id,
+        was_downsampled:
+          sensorData.accelerometer.length !== requestData.accelerometer.length ||
+          sensorData.gyroscope.length !== requestData.gyroscope.length ||
+          sensorData.magnetometer.length !== (requestData.magnetometer?.length || 0) ||
+          sensorData.barometer.length !== (requestData.barometer?.length || 0) ||
+          sensorData.deviceMotion.length !== (requestData.deviceMotion?.length || 0)
       });
 
       const result = await gaitAnalysisAPI.analyzeGait(requestData);

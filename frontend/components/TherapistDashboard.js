@@ -667,7 +667,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   const [reportsData, setReportsData] = useState(null);
   const [loadingReports, setLoadingReports] = useState(false);
 
-  // Scheduling states
+  // Appointments states
   const [therapistAppointments, setTherapistAppointments] = useState([]);
   const [unassignedAppointments, setUnassignedAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
@@ -3096,7 +3096,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
         <View style={styles.tabHeader}>
           <Text style={styles.tabTitle}>
-            {schedulingSubTab === 'my' ? 'My Appointments' : 'Unassigned Requests'}
+              {schedulingSubTab === 'my' ? 'My Appointments' : 'Unassigned Appointments'}
           </Text>
           {schedulingSubTab === 'my' && (
             <View style={styles.headerButtons}>
@@ -3117,11 +3117,11 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={60} color="#CCC" />
             <Text style={styles.emptyText}>
-              {schedulingSubTab === 'my' ? 'No appointments assigned' : 'No unassigned requests'}
+              {schedulingSubTab === 'my' ? 'No appointments assigned' : 'No unassigned appointments'}
             </Text>
             <Text style={styles.emptySubtext}>
               {schedulingSubTab === 'my' 
-                ? 'Create a new appointment or check unassigned requests' 
+                ? 'Create a new appointment or check unassigned appointments' 
                 : 'All appointment requests have been assigned'}
             </Text>
           </View>
@@ -4160,7 +4160,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
             color={activeTab === 'scheduling' ? '#FFF' : '#666'} 
           />
           <Text style={[styles.tabButtonText, activeTab === 'scheduling' && styles.tabButtonTextActive]}>
-            Scheduling
+            Appointments
           </Text>
         </TouchableOpacity>
 

@@ -47,19 +47,21 @@ exports.getTherapistAppointments = async (req, res) => {
   }
 };
 
-// @desc    Get unassigned/pending appointments
+// @desc    Get unassigned active appointments
 // @route   GET /api/therapist/appointments/unassigned
 // @access  Private (Therapist only)
 exports.getUnassignedAppointments = async (req, res) => {
   try {
     const { therapy_type } = req.query;
 
-    // Build query for pending appointments without therapist
+    // Build query for active appointments without a therapist.
+    // Cancelled and no-show appointments should not return to the
+    // unassigned queue.
     const query = {
-      $or: [
-        { therapist_id: null },
-        { status: 'pending' }
-      ]
+      therapist_id: null,
+      status: {
+        $nin: ['cancelled', 'no-show', 'completed']
+      }
     };
 
     if (therapy_type) {

@@ -85,7 +85,7 @@ const BottomNav = ({ activeTab, onTabPress }) => {
           color={activeTab === 'schedule' ? '#C9302C' : '#666'} 
         />
         <Text style={[styles.navText, activeTab === 'schedule' && styles.navTextActive]}>
-          Schedule
+          Appointments
         </Text>
       </TouchableOpacity>
 

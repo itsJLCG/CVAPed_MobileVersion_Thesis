@@ -14,10 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cvacare.mobile"
+      "bundleIdentifier": "com.cvaped.mobile"
     },
     "android": {
-      "package": "com.cvacare.mobile",
+      "package": "com.cvaped.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/CVAPed_Text_foreground.png",
         "backgroundColor": "#ffffff"

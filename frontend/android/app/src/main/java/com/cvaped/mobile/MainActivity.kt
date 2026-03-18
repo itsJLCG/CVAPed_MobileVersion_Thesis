@@ -1,4 +1,4 @@
-package com.cvacare.mobile
+package com.cvaped.mobile
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

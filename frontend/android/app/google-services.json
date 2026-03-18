@@ -14,13 +14,42 @@
       },
       "oauth_client": [
         {
-          "client_id": "292803901437-v14jaibe922qvfh9a2t24v626fia5g6k.apps.googleusercontent.com",
+          "client_id": "292803901437-6212aiiomh8fo1a2c6lta470ft70cavc.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.cvacare.mobile",
-            "certificate_hash": "ac5be5efebd03761ff4e77b4c534d15d40373158"
+            "certificate_hash": "90153cda20ab61f2880a60ab1ab06751cf01b0a7"
           }
         },
+        {
+          "client_id": "292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPwp8Sb8n23ob0Cats9KBs8brn4ok9deg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:292803901437:android:af84a16534fc397a178b94",
+        "android_client_info": {
+          "package_name": "com.cvaped.mobile"
+        }
+      },
+      "oauth_client": [
         {
           "client_id": "292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com",
           "client_type": 3

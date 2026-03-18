@@ -41,6 +41,35 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:292803901437:android:af84a16534fc397a178b94",
+        "android_client_info": {
+          "package_name": "com.cvaped.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPwp8Sb8n23ob0Cats9KBs8brn4ok9deg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

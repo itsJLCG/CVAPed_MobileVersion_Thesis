@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,8 +9,9 @@ import {
   Image,
   Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { successStoryAPI } from '../services/api';
+import { authAPI, successStoryAPI } from '../services/api';
 import TherapyScreen from './TherapyScreen';
 import ProfileScreen from './ProfileScreen';
 import HealthScreen from './HealthScreen';
@@ -19,13 +20,18 @@ import PrescriptiveScreen from './PrescriptiveScreen';
 import AppointmentsScreen from './AppointmentsScreen';
 import SuccessStoryDetailScreen from './SuccessStoryDetailScreen';
 import BottomNav from './BottomNav';
+import InitialDiagnosticModal from './InitialDiagnosticModal';
+import { getRecommendedTherapyTarget } from '../utils/initialDiagnostic';
 
 const { width, height } = Dimensions.get('window');
 
 const HomePage = ({ userData, onLogout }) => {
+  const [sessionUserData, setSessionUserData] = useState(userData);
   const [activeTab, setActiveTab] = useState('home');
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home', 'therapy', 'profile', 'health', 'story-detail'
   const [selectedHomeTherapy, setSelectedHomeTherapy] = useState(null);
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const scrollViewRef = useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [successStories, setSuccessStories] = useState([]);
@@ -94,10 +100,37 @@ const HomePage = ({ userData, onLogout }) => {
         }),
       ])
     ).start();
-  }, []);
+  }, [card1Anim, card2Anim, card3Anim, fadeAnim, loadSuccessStories, pulseAnim, slideAnim]);
+
+  useEffect(() => {
+    setSessionUserData(userData);
+  }, [userData]);
+
+  useEffect(() => {
+    const checkInitialDiagnostic = async () => {
+      try {
+        const storedUserData = await AsyncStorage.getItem('userData');
+        const resolvedUser = storedUserData ? JSON.parse(storedUserData) : userData;
+
+        if (!resolvedUser) {
+          return;
+        }
+
+        setSessionUserData(resolvedUser);
+
+        if (resolvedUser.hasInitialDiagnostic == null && !resolvedUser.diagnosticData?.completedWizard) {
+          setShowDiagnosticModal(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial diagnostic state:', error);
+      }
+    };
+
+    checkInitialDiagnostic();
+  }, [userData]);
 
   // Load success stories
-  const loadSuccessStories = async () => {
+  const loadSuccessStories = useCallback(async () => {
     try {
       setLoadingStories(true);
       const response = await successStoryAPI.getAll();
@@ -110,7 +143,7 @@ const HomePage = ({ userData, onLogout }) => {
     } finally {
       setLoadingStories(false);
     }
-  };
+  }, []);
 
   const handleTabPress = (tab) => {
     console.log('Tab pressed:', tab);
@@ -192,68 +225,110 @@ const HomePage = ({ userData, onLogout }) => {
     setCurrentScreen('home');
   };
 
+  const handleDiagnosticConfirm = async (wizardPayload) => {
+    setDiagnosticLoading(true);
+    try {
+      const response = await authAPI.saveDiagnosticData(wizardPayload);
+      const storedUserData = await AsyncStorage.getItem('userData');
+      const nextUserData = storedUserData
+        ? JSON.parse(storedUserData)
+        : { ...sessionUserData, ...response?.data?.data };
+
+      setSessionUserData(nextUserData);
+      setShowDiagnosticModal(false);
+
+      const recommendedTarget = getRecommendedTherapyTarget(
+        nextUserData?.diagnosticData,
+        nextUserData?.therapyType
+      );
+
+      if (recommendedTarget) {
+        setSelectedHomeTherapy(recommendedTarget);
+        setActiveTab('therapy');
+        setCurrentScreen('therapy');
+      }
+    } catch (error) {
+      console.error('Error saving initial diagnostic:', error);
+    } finally {
+      setDiagnosticLoading(false);
+    }
+  };
+
+  const renderWithGlobalModal = (content, tab = activeTab) => (
+    <View style={styles.container}>
+      {content}
+      <BottomNav activeTab={tab} onTabPress={handleTabPress} />
+      <InitialDiagnosticModal
+        isOpen={showDiagnosticModal}
+        onClose={() => setShowDiagnosticModal(false)}
+        onConfirm={handleDiagnosticConfirm}
+        loading={diagnosticLoading}
+        initialData={sessionUserData?.diagnosticData}
+      />
+    </View>
+  );
+
   // Show Profile screen if profile tab is active
   if (currentScreen === 'profile') {
-    return (
-      <View style={styles.container}>
+    return renderWithGlobalModal(
+      <>
         <ProfileScreen 
-          userData={userData} 
+          userData={sessionUserData} 
           onBack={handleProfileBack}
           onLogout={onLogout}
         />
-        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-      </View>
+      </>
     );
   }
 
   // Show Health screen if health tab is active
   if (currentScreen === 'health') {
     console.log('🏥 Rendering HealthScreen component');
-    return (
-      <View style={styles.container}>
+    return renderWithGlobalModal(
+      <>
         <HealthScreen
           onBack={handleHealthBack}
           onOpenPredictions={() => setCurrentScreen('predictions')}
           onOpenPlan={() => setCurrentScreen('prescriptive')}
         />
-        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-      </View>
+      </>
     );
   }
 
   // Show Predictions screen if predictions tab is active
   if (currentScreen === 'predictions') {
-    return (
-      <View style={styles.container}>
+    return renderWithGlobalModal(
+      <>
         <PredictionsScreen onBack={handlePredictionsBack} />
-        <BottomNav activeTab="health" onTabPress={handleTabPress} />
-      </View>
+      </>,
+      'health'
     );
   }
 
   // Show Prescriptive screen if prescriptive tab is active
   if (currentScreen === 'prescriptive') {
-    return (
-      <View style={styles.container}>
+    return renderWithGlobalModal(
+      <>
         <PrescriptiveScreen onBack={handlePrescriptiveBack} />
-        <BottomNav activeTab="health" onTabPress={handleTabPress} />
-      </View>
+      </>,
+      'health'
     );
   }
 
   // Show Appointments screen if appointments tab is active
   if (currentScreen === 'schedule') {
-    return (
-      <View style={styles.container}>
+    return renderWithGlobalModal(
+      <>
         <AppointmentsScreen onBack={handleAppointmentsBack} />
-        <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-      </View>
+      </>
     );
   }
 
   // Show Therapy screen if therapy tab is active
   if (currentScreen === 'therapy') {
-    return <TherapyScreen onBack={handleTherapyBack} onNavigate={handleNavigateFromTherapy} initialTherapyType={selectedHomeTherapy} />;
+    return renderWithGlobalModal(
+      <TherapyScreen onBack={handleTherapyBack} onNavigate={handleNavigateFromTherapy} initialTherapyType={selectedHomeTherapy} />
+    );
   }
 
   // Show Success Story Detail screen
@@ -261,7 +336,7 @@ const HomePage = ({ userData, onLogout }) => {
     return <SuccessStoryDetailScreen story={selectedStory} onBack={handleStoryDetailBack} />;
   }
 
-  const firstName = userData?.firstName || 'Friend';
+  const firstName = sessionUserData?.firstName || 'Friend';
   const featuredStories = successStories.slice(0, 3);
   const therapyPrograms = [
     {
@@ -316,8 +391,8 @@ const HomePage = ({ userData, onLogout }) => {
     }
   ];
 
-  return (
-    <View style={styles.container}>
+  return renderWithGlobalModal(
+    <>
       <View style={styles.header}>
         <View style={styles.headerLeft} />
         <Text style={styles.headerTitle}>Home</Text>
@@ -622,9 +697,7 @@ const HomePage = ({ userData, onLogout }) => {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
-
-      <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-    </View>
+    </>
   );
 };
 

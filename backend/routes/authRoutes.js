@@ -8,7 +8,8 @@ const {
   updateProfile,
   googleAuth,
   completeProfile,
-  updateDiagnosticStatus
+  updateDiagnosticStatus,
+  saveDiagnosticData
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -35,6 +36,7 @@ router.post('/google', googleAuth);
 router.get('/me', protect, getMe);
 router.put('/updateprofile', protect, updateProfile);
 router.put('/diagnostic-status', protect, updateDiagnosticStatus);
+router.put('/diagnostic-data', protect, saveDiagnosticData);
 router.post('/complete-profile', protect, completeProfile);
 
 module.exports = router;

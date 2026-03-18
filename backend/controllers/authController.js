@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { validationResult } = require('express-validator');
 const { OAuth2Client } = require('google-auth-library');
 const { createOrUpdateFirebaseUser } = require('../config/firebaseAdmin');
+const { buildDiagnosticData, validateInitialDiagnosticData } = require('../utils/initialDiagnostic');
 
 // Initialize Google OAuth client
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '292803901437-fk6kg98k8gj8e61k39osqlvf03cq3aer.apps.googleusercontent.com');
@@ -12,6 +13,35 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '30d'
   });
+};
+
+const buildUserResponse = (user, token = null) => {
+  const response = {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    phone: user.phone,
+    isVerified: user.isVerified,
+    therapyType: user.therapyType,
+    patientType: user.patientType,
+    childInfo: user.childInfo,
+    parentInfo: user.parentInfo,
+    patientInfo: user.patientInfo,
+    picture: user.picture,
+    googleId: user.googleId,
+    hasInitialDiagnostic: user.hasInitialDiagnostic,
+    diagnosticData: user.diagnosticData,
+    diagnosticStatusUpdatedAt: user.diagnosticStatusUpdatedAt,
+    diagnosticProfileUpdatedAt: user.diagnosticProfileUpdatedAt
+  };
+
+  if (token) {
+    response.token = token;
+  }
+
+  return response;
 };
 
 // @desc    Register user
@@ -241,24 +271,7 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        isVerified: user.isVerified,
-        therapyType: user.therapyType,
-        patientType: user.patientType,
-        childInfo: user.childInfo,
-        parentInfo: user.parentInfo,
-        patientInfo: user.patientInfo,
-        picture: user.picture,
-        googleId: user.googleId,
-        hasInitialDiagnostic: user.hasInitialDiagnostic,
-        token: token
-      }
+      data: buildUserResponse(user, token)
     });
   } catch (error) {
     console.error('❌ LOGIN ERROR:', error);
@@ -309,7 +322,7 @@ exports.updateProfile = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      data: buildUserResponse(user)
     });
   } catch (error) {
     res.status(500).json({
@@ -352,22 +365,65 @@ exports.updateDiagnosticStatus = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Diagnostic status updated successfully',
-      data: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        therapyType: user.therapyType,
-        patientType: user.patientType,
-        hasInitialDiagnostic: user.hasInitialDiagnostic,
-        diagnosticStatusUpdatedAt: user.diagnosticStatusUpdatedAt
-      }
+      data: buildUserResponse(user)
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: 'Failed to update diagnostic status',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Save initial diagnostic wizard data
+// @route   PUT /api/auth/diagnostic-data
+// @access  Private
+exports.saveDiagnosticData = async (req, res) => {
+  try {
+    const validation = validateInitialDiagnosticData(req.body);
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Diagnostic data is incomplete',
+        errors: validation.errors
+      });
+    }
+
+    const diagnosticData = buildDiagnosticData(validation.data);
+    const update = {
+      diagnosticData,
+      hasInitialDiagnostic: diagnosticData.hasInitialDiagnostic,
+      diagnosticStatusUpdatedAt: new Date(),
+      diagnosticProfileUpdatedAt: new Date()
+    };
+
+    if (diagnosticData.therapyFocus !== 'both' && diagnosticData.recommendedTherapy) {
+      update.therapyType = diagnosticData.recommendedTherapy;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, {
+      new: true,
+      runValidators: true
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Diagnostic data saved successfully',
+      data: buildUserResponse(user)
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save diagnostic data',
       error: error.message
     });
   }
@@ -461,24 +517,7 @@ exports.googleAuth = async (req, res) => {
         success: true,
         message: 'Login successful',
         needsProfileCompletion: false,
-        data: {
-          _id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          picture: user.picture,
-          role: user.role,
-          phone: user.phone,
-          isVerified: user.isVerified,
-          therapyType: user.therapyType,
-          patientType: user.patientType,
-          childInfo: user.childInfo,
-          parentInfo: user.parentInfo,
-          patientInfo: user.patientInfo,
-          googleId: user.googleId,
-          hasInitialDiagnostic: user.hasInitialDiagnostic,
-          token: token
-        }
+        data: buildUserResponse(user, token)
       });
     } else {
       console.log('📝 Creating new user with Google info...');
@@ -657,21 +696,7 @@ exports.completeProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Profile completed successfully',
-      data: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        therapyType: user.therapyType,
-        patientType: user.patientType,
-        childInfo: user.childInfo,
-        parentInfo: user.parentInfo,
-        patientInfo: user.patientInfo,
-        isVerified: user.isVerified,
-        hasInitialDiagnostic: user.hasInitialDiagnostic,
-        token: token
-      }
+      data: buildUserResponse(user, token)
     });
   } catch (error) {
     console.error('❌ COMPLETE PROFILE ERROR:', error);

@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { successStoryAPI, therapistAPI, appointmentAPI, diagnosticComparisonAPI } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import useDebouncedCallback from '../hooks/useDebouncedCallback';
 
 const { width, height } = Dimensions.get('window');
 
@@ -716,6 +717,48 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     severity_level: '',
     recommended_focus: []
   });
+
+  const { debouncedCallback: debouncedPatientSearch, cancel: cancelPatientSearch } = useDebouncedCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setPatientSearchResults([]);
+      setSearchingPatients(false);
+      return;
+    }
+
+    setSearchingPatients(true);
+    try {
+      const response = await appointmentAPI.therapist.searchPatients(query);
+      if (response.success) {
+        setPatientSearchResults(response.patients || []);
+      }
+    } catch (error) {
+      console.error('Error searching patients:', error);
+    } finally {
+      setSearchingPatients(false);
+    }
+  }, 400);
+
+  const { debouncedCallback: debouncedDiagPatientSearch, cancel: cancelDiagPatientSearch } = useDebouncedCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setDiagSearchResults([]);
+      setShowDiagPatientDropdown(false);
+      setSearchingDiagPatients(false);
+      return;
+    }
+
+    setSearchingDiagPatients(true);
+    try {
+      const response = await appointmentAPI.therapist.searchPatients(query);
+      if (response.success) {
+        setDiagSearchResults(response.patients || []);
+        setShowDiagPatientDropdown(true);
+      }
+    } catch (error) {
+      console.error('Error searching patients:', error);
+    } finally {
+      setSearchingDiagPatients(false);
+    }
+  }, 400);
 
   useEffect(() => {
     loadUserData();
@@ -1942,23 +1985,16 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   const handleSearchPatients = async (query) => {
     setPatientSearchQuery(query);
     if (query.length < 2) {
+      cancelPatientSearch();
       setPatientSearchResults([]);
+      setSearchingPatients(false);
       return;
     }
-    setSearchingPatients(true);
-    try {
-      const response = await appointmentAPI.therapist.searchPatients(query);
-      if (response.success) {
-        setPatientSearchResults(response.patients || []);
-      }
-    } catch (error) {
-      console.error('Error searching patients:', error);
-    } finally {
-      setSearchingPatients(false);
-    }
+    debouncedPatientSearch(query);
   };
 
   const handleSelectPatient = (patient) => {
+    cancelPatientSearch();
     setNewAppointmentData({
       ...newAppointmentData,
       patient_id: patient._id,
@@ -2081,25 +2117,17 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   // ==================== DIAGNOSTIC COMPARISON FUNCTIONS ====================
   const searchDiagPatients = async (query) => {
     if (!query || query.length < 2) {
+      cancelDiagPatientSearch();
       setDiagSearchResults([]);
       setShowDiagPatientDropdown(false);
+      setSearchingDiagPatients(false);
       return;
     }
-    setSearchingDiagPatients(true);
-    try {
-      const response = await appointmentAPI.therapist.searchPatients(query);
-      if (response.success) {
-        setDiagSearchResults(response.patients || []);
-        setShowDiagPatientDropdown(true);
-      }
-    } catch (error) {
-      console.error('Error searching patients:', error);
-    } finally {
-      setSearchingDiagPatients(false);
-    }
+    debouncedDiagPatientSearch(query);
   };
 
   const selectDiagPatient = async (patient) => {
+    cancelDiagPatientSearch();
     setSelectedDiagPatient(patient);
     setDiagSearchQuery(`${patient.firstName} ${patient.lastName}`);
     setShowDiagPatientDropdown(false);

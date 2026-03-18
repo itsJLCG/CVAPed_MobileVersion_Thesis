@@ -734,9 +734,8 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       loadArticulationExercises();
     } else if (activeTab === 'success-stories') {
       loadSuccessStories();
-    } else if (activeTab === 'reports') {
+    } else if (activeTab === 'overview' || activeTab === 'scheduling') {
       loadReports();
-    } else if (activeTab === 'scheduling') {
       loadTherapistAppointments();
       loadUnassignedAppointments();
     } else if (activeTab === 'diagnostic') {
@@ -757,7 +756,11 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    if (activeTab === 'fluency') {
+    if (activeTab === 'overview' || activeTab === 'scheduling') {
+      await loadReports();
+      await loadTherapistAppointments();
+      await loadUnassignedAppointments();
+    } else if (activeTab === 'fluency') {
       await loadFluencyExercises();
     } else if (activeTab === 'language' && activeSubTab === 'expressive') {
       await loadLanguageExercises();
@@ -2233,31 +2236,125 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
     return { text: 'Regression', color: '#ef4444', icon: '🚨' };
   };
 
-  const renderOverview = () => (
-    <View style={styles.overviewContainer}>
-      <View style={styles.welcomeCard}>
-        <Ionicons name="person-circle" size={70} color="#C9302C" />
-        <Text style={styles.welcomeTitle}>Welcome, Therapist!</Text>
-        <Text style={styles.welcomeName}>{user?.firstName || 'User'}</Text>
-        <Text style={styles.welcomeSubtitle}>
-          Use the tabs below to manage therapy exercises for all speech therapy categories.
-        </Text>
-      </View>
+  const renderOverview = () => {
+    const appointmentStats = reportsData?.appointmentStats || {};
+    const highestAgeBracketLabel = reportsData?.highestAgeBracket?.range || 'N/A';
+    const topGender = reportsData?.genderDistribution?.length
+      ? [...reportsData.genderDistribution].sort((a, b) => b.count - a.count)[0]
+      : null;
 
-      <View style={styles.infoCard}>
-        <Ionicons name="information-circle" size={22} color="#C9302C" />
-        <Text style={styles.infoText}>
-          You can create, edit, activate/deactivate, and delete exercises for:
-        </Text>
-        <View style={styles.categoryList}>
-          <Text style={styles.categoryItem}>• Fluency Therapy (5 levels)</Text>
-          <Text style={styles.categoryItem}>• Expressive Language (3 levels)</Text>
-          <Text style={styles.categoryItem}>• Receptive Language (3 levels)</Text>
-          <Text style={styles.categoryItem}>• Articulation (5 sounds × 5 levels)</Text>
+    const overviewStats = [
+      {
+        label: 'My Appointments',
+        value: appointmentStats.total || 0,
+        icon: 'calendar',
+        color: '#C9302C'
+      },
+      {
+        label: 'Today',
+        value: appointmentStats.today || 0,
+        icon: 'today',
+        color: '#2563eb'
+      },
+      {
+        label: 'Upcoming',
+        value: appointmentStats.upcoming || 0,
+        icon: 'time',
+        color: '#7c3aed'
+      },
+      {
+        label: 'Completed',
+        value: appointmentStats.completed || 0,
+        icon: 'checkmark-circle',
+        color: '#059669'
+      },
+      {
+        label: 'Missed or Cancelled',
+        value: appointmentStats.missedOrCancelled || 0,
+        icon: 'alert-circle',
+        color: '#d97706'
+      },
+      {
+        label: 'Unassigned Queue',
+        value: appointmentStats.unassigned || 0,
+        icon: 'people',
+        color: '#0891b2'
+      },
+      {
+        label: 'Patients Served',
+        value: appointmentStats.patientsServed || 0,
+        icon: 'person',
+        color: '#4f46e5'
+      },
+      {
+        label: 'Total Patients',
+        value: reportsData?.totalPatients || 0,
+        icon: 'people-circle',
+        color: '#0f766e'
+      },
+      {
+        label: 'Top Age Group',
+        value: highestAgeBracketLabel,
+        icon: 'bar-chart',
+        color: '#b45309'
+      },
+      {
+        label: 'Top Gender Mix',
+        value: topGender ? `${topGender.gender} (${topGender.percentage}%)` : 'N/A',
+        icon: 'pie-chart',
+        color: '#9333ea'
+      }
+    ];
+
+    return (
+      <ScrollView
+        style={styles.tabContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.overviewContainer}>
+          <View style={styles.welcomeCard}>
+            <Ionicons name="person-circle" size={70} color="#C9302C" />
+            <Text style={styles.welcomeTitle}>Welcome, Therapist!</Text>
+            <Text style={styles.welcomeName}>{user?.firstName || 'User'}</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Monitor your caseload, track appointment activity, and stay on top of unassigned requests.
+            </Text>
+          </View>
+
+          <View style={styles.tabHeader}>
+            <Text style={styles.tabTitle}>Overview</Text>
+            {loadingReports && <ActivityIndicator size="small" color="#C9302C" />}
+          </View>
+
+          <View style={styles.overviewStatsGrid}>
+            {overviewStats.map((stat) => (
+              <View key={stat.label} style={styles.overviewStatCard}>
+                <View style={[styles.overviewStatIconWrap, { backgroundColor: `${stat.color}15` }]}>
+                  <Ionicons name={stat.icon} size={20} color={stat.color} />
+                </View>
+                <Text style={styles.overviewStatValue}>{stat.value}</Text>
+                <Text style={styles.overviewStatLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.infoCard}>
+            <Ionicons name="pulse" size={22} color="#C9302C" />
+            <Text style={styles.infoText}>
+              Quick summary of your current workload and appointment pipeline.
+            </Text>
+            <View style={styles.categoryList}>
+              <Text style={styles.categoryItem}>• Active caseload: {appointmentStats.active || 0} appointments still in progress</Text>
+              <Text style={styles.categoryItem}>• Today's workload: {appointmentStats.today || 0} appointments on the calendar</Text>
+              <Text style={styles.categoryItem}>• Queue health: {appointmentStats.unassigned || 0} appointments need a therapist</Text>
+              <Text style={styles.categoryItem}>• Follow-up risk: {appointmentStats.missedOrCancelled || 0} missed or cancelled appointments</Text>
+              <Text style={styles.categoryItem}>• Patient base: {reportsData?.totalPatients || 0} total patients in the system</Text>
+            </View>
+          </View>
         </View>
-      </View>
-    </View>
-  );
+      </ScrollView>
+    );
+  };
 
   const renderFluencyTab = () => {
     const levelColors = {
@@ -3071,44 +3168,85 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
   const renderSchedulingTab = () => {
     const appointmentsToShow = schedulingSubTab === 'my' ? therapistAppointments : unassignedAppointments;
+    const activeCount = therapistAppointments.filter((appt) => !['cancelled', 'no-show', 'completed'].includes(appt.status)).length;
+    const completedCount = therapistAppointments.filter((appt) => appt.status === 'completed').length;
 
     return (
       <View style={styles.tabContent}>
-        {/* Sub-tab navigation */}
-        <View style={styles.subTabContainer}>
-          <TouchableOpacity 
-            style={[styles.subTab, schedulingSubTab === 'my' && styles.subTabActive]}
-            onPress={() => setSchedulingSubTab('my')}
-          >
-            <Text style={[styles.subTabText, schedulingSubTab === 'my' && styles.subTabTextActive]}>
-              My Appointments ({therapistAppointments.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.subTab, schedulingSubTab === 'unassigned' && styles.subTabActive]}
-            onPress={() => setSchedulingSubTab('unassigned')}
-          >
-            <Text style={[styles.subTabText, schedulingSubTab === 'unassigned' && styles.subTabTextActive]}>
-              Unassigned ({unassignedAppointments.length})
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.appointmentsHero}>
+          <View style={styles.appointmentsHeroHeader}>
+            <View>
+              <Text style={styles.appointmentsHeroTitle}>Appointments Hub</Text>
+              <Text style={styles.appointmentsHeroSubtitle}>
+                Manage your sessions and review requests waiting for therapist assignment.
+              </Text>
+            </View>
+            {schedulingSubTab === 'my' && (
+              <TouchableOpacity 
+                style={styles.appointmentsCreateButton} 
+                onPress={() => setShowCreateAppointmentModal(true)}
+              >
+                <Ionicons name="add-circle" size={16} color="#FFF" />
+                <Text style={styles.seedButtonText}>Create</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.appointmentsKpiRow}>
+            <View style={styles.appointmentsKpiCard}>
+              <Text style={styles.appointmentsKpiValue}>{therapistAppointments.length}</Text>
+              <Text style={styles.appointmentsKpiLabel}>All assigned</Text>
+            </View>
+            <View style={styles.appointmentsKpiCard}>
+              <Text style={styles.appointmentsKpiValue}>{activeCount}</Text>
+              <Text style={styles.appointmentsKpiLabel}>Active</Text>
+            </View>
+            <View style={styles.appointmentsKpiCard}>
+              <Text style={styles.appointmentsKpiValue}>{completedCount}</Text>
+              <Text style={styles.appointmentsKpiLabel}>Completed</Text>
+            </View>
+            <View style={styles.appointmentsKpiCard}>
+              <Text style={styles.appointmentsKpiValue}>{unassignedAppointments.length}</Text>
+              <Text style={styles.appointmentsKpiLabel}>Queue</Text>
+            </View>
+          </View>
+
+          <View style={styles.appointmentsSwitchRow}>
+            <TouchableOpacity 
+              style={[styles.appointmentsSwitchCard, schedulingSubTab === 'my' && styles.appointmentsSwitchCardActive]}
+              onPress={() => setSchedulingSubTab('my')}
+            >
+              <Ionicons name="briefcase" size={18} color={schedulingSubTab === 'my' ? '#fff' : '#9f1239'} />
+              <Text style={[styles.appointmentsSwitchTitle, schedulingSubTab === 'my' && styles.appointmentsSwitchTitleActive]}>
+                My Appointments
+              </Text>
+              <Text style={[styles.appointmentsSwitchCount, schedulingSubTab === 'my' && styles.appointmentsSwitchCountActive]}>
+                {therapistAppointments.length}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.appointmentsSwitchCard, schedulingSubTab === 'unassigned' && styles.appointmentsSwitchCardActive]}
+              onPress={() => setSchedulingSubTab('unassigned')}
+            >
+              <Ionicons name="git-pull-request" size={18} color={schedulingSubTab === 'unassigned' ? '#fff' : '#9f1239'} />
+              <Text style={[styles.appointmentsSwitchTitle, schedulingSubTab === 'unassigned' && styles.appointmentsSwitchTitleActive]}>
+                Unassigned
+              </Text>
+              <Text style={[styles.appointmentsSwitchCount, schedulingSubTab === 'unassigned' && styles.appointmentsSwitchCountActive]}>
+                {unassignedAppointments.length}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.tabHeader}>
           <Text style={styles.tabTitle}>
               {schedulingSubTab === 'my' ? 'My Appointments' : 'Unassigned Appointments'}
           </Text>
-          {schedulingSubTab === 'my' && (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity 
-                style={styles.addButton} 
-                onPress={() => setShowCreateAppointmentModal(true)}
-              >
-                <Ionicons name="add-circle" size={14} color="#FFF" />
-                <Text style={styles.seedButtonText}>Create</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Text style={styles.appointmentsHeaderMeta}>
+            {schedulingSubTab === 'my' ? 'Tap a card to update session details' : 'Review and claim open requests'}
+          </Text>
         </View>
 
         {loadingAppointments ? (
@@ -3143,48 +3281,50 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
             {appointmentsToShow.map((appt) => (
               <TouchableOpacity
                 key={appt._id}
-                style={[
-                  styles.exerciseCard,
-                  { borderLeftWidth: 4, borderLeftColor: getApptStatusColor(appt.status) }
-                ]}
+                style={[styles.appointmentCard, { borderColor: `${getApptStatusColor(appt.status)}30` }]}
                 onPress={() => {
                   setSelectedAppointmentDetail(appt);
                   setShowAppointmentDetailModal(true);
                 }}
                 activeOpacity={0.7}
               >
-                <View style={styles.exerciseHeader}>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2C3E50' }}>
-                      {getApptTherapyIcon(appt.therapy_type)}{' '}
-                      {appt.therapy_type.charAt(0).toUpperCase() + appt.therapy_type.slice(1)}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: '#666', marginTop: 2 }}>
-                      {appt.patient_name || 'Unknown Patient'}
-                    </Text>
+                <View style={styles.appointmentCardHeader}>
+                  <View style={styles.appointmentCardIdentity}>
+                    <View style={[styles.appointmentTherapyBadge, { backgroundColor: `${getApptStatusColor(appt.status)}18` }]}>
+                      <Text style={styles.appointmentTherapyBadgeText}>{getApptTherapyIcon(appt.therapy_type)}</Text>
+                    </View>
+                    <View style={styles.exerciseInfo}>
+                      <Text style={styles.appointmentTypeText}>
+                        {appt.therapy_type.charAt(0).toUpperCase() + appt.therapy_type.slice(1)}
+                      </Text>
+                      <Text style={styles.appointmentPatientText}>
+                        {appt.patient_name || 'Unknown Patient'}
+                      </Text>
+                    </View>
                   </View>
                   <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: getApptStatusColor(appt.status) }
+                    styles.appointmentStatusPill,
+                    { backgroundColor: `${getApptStatusColor(appt.status)}20` }
                   ]}>
-                    <Text style={styles.statusText}>
+                    <View style={[styles.appointmentStatusDot, { backgroundColor: getApptStatusColor(appt.status) }]} />
+                    <Text style={[styles.appointmentStatusText, { color: getApptStatusColor(appt.status) }]}>
                       {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
                     </Text>
                   </View>
                 </View>
 
-                <View style={{ marginTop: 8, gap: 4 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="calendar-outline" size={14} color="#999" />
-                    <Text style={{ fontSize: 13, color: '#555' }}>
+                <View style={styles.appointmentMetaGrid}>
+                  <View style={styles.appointmentMetaItem}>
+                    <Ionicons name="calendar-outline" size={14} color="#9f1239" />
+                    <Text style={styles.appointmentMetaText}>
                       {new Date(appt.appointment_date).toLocaleDateString('en-US', {
                         weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
                       })}
                     </Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="time-outline" size={14} color="#999" />
-                    <Text style={{ fontSize: 13, color: '#555' }}>
+                  <View style={styles.appointmentMetaItem}>
+                    <Ionicons name="time-outline" size={14} color="#9f1239" />
+                    <Text style={styles.appointmentMetaText}>
                       {new Date(appt.appointment_date).toLocaleTimeString('en-US', {
                         hour: '2-digit', minute: '2-digit'
                       })}
@@ -3193,22 +3333,23 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
                   </View>
                 </View>
 
-                {schedulingSubTab === 'unassigned' && (
-                  <TouchableOpacity
-                    style={{
-                      marginTop: 10,
-                      backgroundColor: '#C9302C',
-                      paddingVertical: 8,
-                      borderRadius: 6,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => handleAssignAppointment(appt._id)}
-                  >
-                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 13 }}>
-                      Assign to Me
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <View style={styles.appointmentFooterRow}>
+                  <Text style={styles.appointmentFooterHint}>
+                    {schedulingSubTab === 'my' ? 'Open to review or update this session' : 'Open request waiting for therapist assignment'}
+                  </Text>
+
+                  {schedulingSubTab === 'unassigned' && (
+                    <TouchableOpacity
+                      style={styles.assignAppointmentButton}
+                      onPress={() => handleAssignAppointment(appt._id)}
+                    >
+                      <Ionicons name="person-add" size={14} color="#FFF" />
+                      <Text style={styles.assignAppointmentButtonText}>
+                        Assign to Me
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -4051,145 +4192,56 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       </View>
 
       {/* Tab Navigation */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabNavigation}>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'overview' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('overview')}
-        >
-          <Ionicons 
-            name="home" 
-            size={16} 
-            color={activeTab === 'overview' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'overview' && styles.tabButtonTextActive]}>
-            Overview
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.tabNavigationShell}>
+        <View style={styles.tabNavigationHeader}>
+          <Text style={styles.tabNavigationTitle}>Workspace</Text>
+          <Text style={styles.tabNavigationHint}>Switch between summary and day-to-day scheduling.</Text>
+        </View>
+        <View style={styles.segmentedTabs}>
+          <TouchableOpacity 
+            style={[styles.segmentedTab, activeTab === 'overview' && styles.segmentedTabActive]}
+            onPress={() => setActiveTab('overview')}
+          >
+            <View style={styles.segmentedTabTop}>
+              <Ionicons 
+                name="grid" 
+                size={18} 
+                color={activeTab === 'overview' ? '#FFFFFF' : '#9f1239'} 
+              />
+              <Text style={[styles.segmentedTabTitle, activeTab === 'overview' && styles.segmentedTabTitleActive]}>
+                Overview
+              </Text>
+            </View>
+            <Text style={[styles.segmentedTabSubtitle, activeTab === 'overview' && styles.segmentedTabSubtitleActive]}>
+              {`${reportsData?.appointmentStats?.active || 0} active appointments`}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'articulation' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('articulation')}
-        >
-          <Ionicons 
-            name="mic" 
-            size={16} 
-            color={activeTab === 'articulation' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'articulation' && styles.tabButtonTextActive]}>
-            Articulation
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'language' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('language')}
-        >
-          <Ionicons 
-            name="chatbubbles" 
-            size={16} 
-            color={activeTab === 'language' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'language' && styles.tabButtonTextActive]}>
-            Language
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'fluency' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('fluency')}
-        >
-          <Ionicons 
-            name="musical-notes" 
-            size={16} 
-            color={activeTab === 'fluency' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'fluency' && styles.tabButtonTextActive]}>
-            Fluency
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'progress' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('progress')}
-        >
-          <Ionicons 
-            name="analytics" 
-            size={16} 
-            color={activeTab === 'progress' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'progress' && styles.tabButtonTextActive]}>
-            Patient Progress
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'success-stories' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('success-stories')}
-        >
-          <Ionicons 
-            name="star" 
-            size={16} 
-            color={activeTab === 'success-stories' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'success-stories' && styles.tabButtonTextActive]}>
-            Success Stories
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'reports' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('reports')}
-        >
-          <Ionicons 
-            name="bar-chart" 
-            size={16} 
-            color={activeTab === 'reports' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'reports' && styles.tabButtonTextActive]}>
-            Reports
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'scheduling' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('scheduling')}
-        >
-          <Ionicons 
-            name="calendar" 
-            size={16} 
-            color={activeTab === 'scheduling' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'scheduling' && styles.tabButtonTextActive]}>
-            Appointments
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'diagnostic' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('diagnostic')}
-        >
-          <Ionicons 
-            name="git-compare" 
-            size={16} 
-            color={activeTab === 'diagnostic' ? '#FFF' : '#666'} 
-          />
-          <Text style={[styles.tabButtonText, activeTab === 'diagnostic' && styles.tabButtonTextActive]}>
-            Compare
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity 
+            style={[styles.segmentedTab, activeTab === 'scheduling' && styles.segmentedTabActive]}
+            onPress={() => setActiveTab('scheduling')}
+          >
+            <View style={styles.segmentedTabTop}>
+              <Ionicons 
+                name="calendar-clear" 
+                size={18} 
+                color={activeTab === 'scheduling' ? '#FFFFFF' : '#9f1239'} 
+              />
+              <Text style={[styles.segmentedTabTitle, activeTab === 'scheduling' && styles.segmentedTabTitleActive]}>
+                Appointments
+              </Text>
+            </View>
+            <Text style={[styles.segmentedTabSubtitle, activeTab === 'scheduling' && styles.segmentedTabSubtitleActive]}>
+              {`${unassignedAppointments.length} waiting in queue`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Content */}
       <View style={styles.content}>
         {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'fluency' && renderFluencyTab()}
-        {activeTab === 'language' && renderLanguageTab()}
-        {activeTab === 'articulation' && renderArticulationTab()}
-        {activeTab === 'progress' && renderProgressTab()}
-        {activeTab === 'success-stories' && renderSuccessStoriesTab()}
-        {activeTab === 'reports' && renderReportsTab()}
         {activeTab === 'scheduling' && renderSchedulingTab()}
-        {activeTab === 'diagnostic' && renderDiagnosticTab()}
       </View>
 
       {/* Fluency Modal */}
@@ -4780,7 +4832,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
               <Text style={styles.sectionTitle}>Options (with emojis/icons)</Text>
               {[0, 1, 2, 3].map((index) => (
-                <View key={index} style={styles.optionRow}>
+                <View key={index} style={styles.modalOptionRow}>
                   <View style={{flex: 2}}>
                     <Text style={styles.label}>Option {index + 1} Text</Text>
                     <TextInput
@@ -5229,34 +5281,69 @@ const styles = StyleSheet.create({
   logoutButton: {
     padding: 8,
   },
-  tabNavigation: {
-    backgroundColor: '#FFFFFF',
+  tabNavigationShell: {
+    backgroundColor: '#fff7f7',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    maxHeight: 40,
+    borderBottomColor: '#f5d0d0',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
   },
-  tabButton: {
+  tabNavigationHeader: {
+    marginBottom: 12,
+  },
+  tabNavigationTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#7f1d1d',
+  },
+  tabNavigationHint: {
+    fontSize: 12,
+    color: '#b45309',
+    marginTop: 3,
+  },
+  segmentedTabs: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  segmentedTab: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f5d0d0',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    shadowColor: '#7f1d1d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  segmentedTabActive: {
+    backgroundColor: '#C9302C',
+    borderColor: '#C9302C',
+  },
+  segmentedTabTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginHorizontal: 3,
-    borderRadius: 6,
-    backgroundColor: '#F8F9FA',
+    gap: 8,
   },
-  tabButtonActive: {
-    backgroundColor: '#C9302C',
+  segmentedTabTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9f1239',
   },
-  tabButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
-    marginLeft: 4,
-  },
-  tabButtonTextActive: {
+  segmentedTabTitleActive: {
     color: '#FFFFFF',
+  },
+  segmentedTabSubtitle: {
+    fontSize: 12,
+    color: '#881337',
+    marginTop: 8,
+  },
+  segmentedTabSubtitleActive: {
+    color: '#ffe4e6',
   },
   content: {
     flex: 1,
@@ -5763,7 +5850,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  optionRow: {
+  modalOptionRow: {
     flexDirection: 'row',
     marginBottom: 12,
   },
@@ -6360,6 +6447,248 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  overviewStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  overviewStatCard: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  overviewStatIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  overviewStatLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
+  },
+  overviewStatValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1e293b',
+  },
+  appointmentsHero: {
+    backgroundColor: '#fff7f7',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5d0d0',
+  },
+  appointmentsHeroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  appointmentsHeroTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#7f1d1d',
+  },
+  appointmentsHeroSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#9a3412',
+    lineHeight: 18,
+    maxWidth: 230,
+  },
+  appointmentsCreateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#C9302C',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  appointmentsKpiRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+  },
+  appointmentsKpiCard: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#f3d4d4',
+  },
+  appointmentsKpiValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1f2937',
+  },
+  appointmentsKpiLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 6,
+  },
+  appointmentsSwitchRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  appointmentsSwitchCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f5d0d0',
+    padding: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  appointmentsSwitchCardActive: {
+    backgroundColor: '#C9302C',
+    borderColor: '#C9302C',
+  },
+  appointmentsSwitchTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9f1239',
+  },
+  appointmentsSwitchTitleActive: {
+    color: '#FFFFFF',
+  },
+  appointmentsSwitchCount: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#7f1d1d',
+  },
+  appointmentsSwitchCountActive: {
+    color: '#FFFFFF',
+  },
+  appointmentsHeaderMeta: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'right',
+    marginLeft: 12,
+  },
+  appointmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  appointmentCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  appointmentCardIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  appointmentTherapyBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appointmentTherapyBadgeText: {
+    fontSize: 18,
+  },
+  appointmentTypeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1f2937',
+  },
+  appointmentPatientText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 3,
+  },
+  appointmentStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  appointmentStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  appointmentStatusText: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'capitalize',
+  },
+  appointmentMetaGrid: {
+    marginTop: 14,
+    gap: 8,
+  },
+  appointmentMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  appointmentMetaText: {
+    fontSize: 13,
+    color: '#475569',
+    flex: 1,
+  },
+  appointmentFooterRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  appointmentFooterHint: {
+    flex: 1,
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 17,
+  },
+  assignAppointmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#C9302C',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  assignAppointmentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   bottomSpacing: {
     height: 30,

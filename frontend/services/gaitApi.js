@@ -58,7 +58,11 @@ export const gaitAnalysisAPI = {
       const response = await gaitApi.post('/gait/analyze', {
         accelerometer: data.accelerometer,
         gyroscope: data.gyroscope,
-        session_id: data.sessionId || `session_${Date.now()}`,
+        magnetometer: data.magnetometer,
+        barometer: data.barometer,
+        deviceMotion: data.deviceMotion,
+        pedometer: data.pedometer,
+        session_id: data.session_id || data.sessionId || `session_${Date.now()}`,
       });
       return response.data;
     } catch (error) {

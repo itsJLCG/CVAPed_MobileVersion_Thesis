@@ -42,10 +42,19 @@ const ExercisePlanSchema = new mongoose.Schema({
       unit: String
     }
   }],
-  
+  problem_summary: {
+    overall_status: String,
+    risk_level: String,
+    total_problems: Number,
+    severe_count: Number,
+    moderate_count: Number,
+    summary: String
+  },
+
   // Recommended exercises
   exercises: [{
     exercise_id: String,      // Unique exercise ID from library
+    name: String,
     exercise_name: String,
     description: String,
     target_metric: String,    // Which gait metric this improves
@@ -67,6 +76,9 @@ const ExercisePlanSchema = new mongoose.Schema({
     
     // Expected outcomes
     expected_improvement: String,
+    detectable: Boolean,
+    hardware_compatible: Boolean,
+    requires_manual_validation: Boolean,
     
     // Completion tracking for this specific exercise
     completed: {

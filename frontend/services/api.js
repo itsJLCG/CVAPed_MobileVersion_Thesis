@@ -709,6 +709,22 @@ export const appointmentAPI = {
       }
     },
 
+    // Get full appointments log
+    getAppointmentsLog: async (filters = {}) => {
+      try {
+        const params = new URLSearchParams();
+        if (filters.status) params.append('status', filters.status);
+        if (filters.therapy_type) params.append('therapy_type', filters.therapy_type);
+        if (filters.limit) params.append('limit', filters.limit);
+
+        const query = params.toString();
+        const response = await api.get(`/therapist/appointments/log${query ? `?${query}` : ''}`);
+        return response.data;
+      } catch (error) {
+        throw error.response?.data || error.message;
+      }
+    },
+
     // Assign therapist to appointment
     assignToAppointment: async (appointmentId) => {
       try {

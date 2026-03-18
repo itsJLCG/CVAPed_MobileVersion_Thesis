@@ -1,3 +1,4 @@
+const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 
 // @desc    Get therapist reports/analytics
@@ -18,8 +19,17 @@ exports.getReports = async (req, res) => {
 
     console.log('📊 Calculating therapist reports...');
 
+    const therapistId = req.user._id;
+
     // Get all patients (users with role 'patient')
     const patients = await User.find({ role: 'patient' }).select('age gender');
+    const therapistAppointments = await Appointment.find({ therapist_id: therapistId }).select(
+      'appointment_date status patient_id patient_email patient_name'
+    );
+    const unassignedAppointments = await Appointment.countDocuments({
+      therapist_id: null,
+      status: { $nin: ['cancelled', 'no-show', 'completed'] }
+    });
     
     const totalPatients = patients.length;
 
@@ -129,9 +139,59 @@ exports.getReports = async (req, res) => {
       });
     }
 
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const appointmentStats = {
+      total: therapistAppointments.length,
+      today: 0,
+      upcoming: 0,
+      completed: 0,
+      missedOrCancelled: 0,
+      active: 0,
+      unassigned: unassignedAppointments,
+      patientsServed: 0
+    };
+
+    const uniquePatients = new Set();
+
+    therapistAppointments.forEach((appointment) => {
+      const appointmentDate = new Date(appointment.appointment_date);
+      const patientKey = appointment.patient_id || appointment.patient_email || appointment.patient_name;
+
+      if (patientKey) {
+        uniquePatients.add(String(patientKey));
+      }
+
+      if (appointmentDate >= todayStart && appointmentDate < tomorrowStart) {
+        appointmentStats.today += 1;
+      }
+
+      if (appointmentDate >= todayStart && !['cancelled', 'no-show', 'completed'].includes(appointment.status)) {
+        appointmentStats.upcoming += 1;
+      }
+
+      if (appointment.status === 'completed') {
+        appointmentStats.completed += 1;
+      }
+
+      if (['cancelled', 'no-show'].includes(appointment.status)) {
+        appointmentStats.missedOrCancelled += 1;
+      }
+
+      if (!['cancelled', 'no-show', 'completed'].includes(appointment.status)) {
+        appointmentStats.active += 1;
+      }
+    });
+
+    appointmentStats.patientsServed = uniquePatients.size;
+
     console.log('✅ Therapist reports calculated successfully');
     console.log(`Total patients: ${totalPatients}`);
     console.log(`Highest age bracket: ${highestAgeBracket.range} (${highestAgeBracket.count} patients)`);
+    console.log(`Therapist appointments: ${appointmentStats.total}`);
 
     res.status(200).json({
       success: true,
@@ -139,7 +199,8 @@ exports.getReports = async (req, res) => {
         totalPatients,
         ageBrackets: ageBracketsWithHighest,
         genderDistribution,
-        highestAgeBracket: highestAgeBracket.range
+        highestAgeBracket,
+        appointmentStats
       }
     });
 

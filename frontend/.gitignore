@@ -40,3 +40,6 @@ yarn-error.*
 /ios
 # Keep android directory for EAS Build to preserve keystore fingerprint
 # /android
+
+# local build tooling
+.tools/

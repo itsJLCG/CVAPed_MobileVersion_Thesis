@@ -205,7 +205,6 @@ export default function App() {
           onRegister={handleRegister}
           onLoginSuccess={handleLoginSuccess}
           onGoogleSignIn={handleGoogleSignIn}
-          onRequiresVerification={handleRequiresVerification}
         />
         <StatusBar style="auto" />
       </SafeAreaWrapper>

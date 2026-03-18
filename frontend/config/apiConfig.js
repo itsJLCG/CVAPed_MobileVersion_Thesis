@@ -9,19 +9,19 @@ const PORTS = {
 };
 
 const MAIN_API_URL = process.env.EXPO_PUBLIC_API_URL || `http://${BASE_IP}:${PORTS.MAIN_API}/api`;
-const GAIT_API_URL = process.env.EXPO_PUBLIC_GAIT_API_URL || `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`;
-const THERAPY_API_URL = process.env.EXPO_PUBLIC_THERAPY_API_URL || `http://${BASE_IP}:${PORTS.THERAPY}`;
+const GAIT_SERVICE_URL = process.env.EXPO_PUBLIC_GAIT_API_URL || `http://${BASE_IP}:${PORTS.GAIT_ANALYSIS}`;
+const THERAPY_SERVICE_URL = process.env.EXPO_PUBLIC_THERAPY_API_URL || `http://${BASE_IP}:${PORTS.THERAPY}`;
 
 export const API_CONFIG = {
   BASE_IP,
   MAIN_API_URL,
-  GAIT_API_URL,
-  THERAPY_API_URL,
+  GAIT_API_URL: GAIT_SERVICE_URL,
+  THERAPY_API_URL: THERAPY_SERVICE_URL,
 };
 
 export const API_URL = MAIN_API_URL;
-export const GAIT_API_URL = GAIT_API_URL;
-export const THERAPY_API_URL = THERAPY_API_URL;
+export const GAIT_API_URL = GAIT_SERVICE_URL;
+export const THERAPY_API_URL = THERAPY_SERVICE_URL;
 
 console.log('📡 API Configuration:', {
   'Main API': API_CONFIG.MAIN_API_URL,

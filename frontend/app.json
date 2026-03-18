@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "CVACare",
+    "name": "CVAPed",
     "slug": "cvacare",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/CVAPed_Text_square.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -14,15 +14,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cvacare.mobile"
+      "bundleIdentifier": "com.cvaped.mobile"
     },
     "android": {
-      "package": "com.cvacare.mobile",
+      "package": "com.cvaped.mobile",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/CVAPed_Text_foreground.png",
         "backgroundColor": "#ffffff"
       },
-      "icon": "./assets/icon.png",
+      "icon": "./assets/CVAPed_Text_square.png",
       "edgeToEdgeEnabled": true,
       "googleServicesFile": "./google-services.json"
     },

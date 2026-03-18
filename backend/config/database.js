@@ -1,4 +1,14 @@
+const dns = require('dns');
 const mongoose = require('mongoose');
+
+const PUBLIC_DNS_SERVERS = ['8.8.8.8', '1.1.1.1'];
+
+try {
+  dns.setServers(PUBLIC_DNS_SERVERS);
+  console.log('🔧 DNS servers set for MongoDB:', PUBLIC_DNS_SERVERS.join(', '));
+} catch (error) {
+  console.warn('⚠️ Could not override DNS servers for MongoDB:', error.message);
+}
 
 const connectDB = async () => {
   try {

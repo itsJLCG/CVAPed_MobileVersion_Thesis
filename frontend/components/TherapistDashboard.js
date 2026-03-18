@@ -671,8 +671,9 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   // Appointments states
   const [therapistAppointments, setTherapistAppointments] = useState([]);
   const [unassignedAppointments, setUnassignedAppointments] = useState([]);
+  const [appointmentsLog, setAppointmentsLog] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
-  const [schedulingSubTab, setSchedulingSubTab] = useState('my'); // 'my', 'unassigned'
+  const [schedulingSubTab, setSchedulingSubTab] = useState('my'); // 'my', 'unassigned', 'log'
   const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
   const [showAppointmentDetailModal, setShowAppointmentDetailModal] = useState(false);
   const [selectedAppointmentDetail, setSelectedAppointmentDetail] = useState(null);
@@ -781,6 +782,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       loadReports();
       loadTherapistAppointments();
       loadUnassignedAppointments();
+      loadAppointmentsLog();
     } else if (activeTab === 'diagnostic') {
       // Keep selectedDiagPatient if already set; otherwise no auto-load
     }
@@ -803,6 +805,7 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       await loadReports();
       await loadTherapistAppointments();
       await loadUnassignedAppointments();
+      await loadAppointmentsLog();
     } else if (activeTab === 'fluency') {
       await loadFluencyExercises();
     } else if (activeTab === 'language' && activeSubTab === 'expressive') {
@@ -1953,6 +1956,17 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
       }
     } catch (error) {
       console.error('Error loading unassigned appointments:', error);
+    }
+  };
+
+  const loadAppointmentsLog = async () => {
+    try {
+      const response = await appointmentAPI.therapist.getAppointmentsLog({ limit: 200 });
+      if (response.success) {
+        setAppointmentsLog(response.appointments || []);
+      }
+    } catch (error) {
+      console.error('Error loading appointments log:', error);
     }
   };
 
@@ -3195,7 +3209,11 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
   };
 
   const renderSchedulingTab = () => {
-    const appointmentsToShow = schedulingSubTab === 'my' ? therapistAppointments : unassignedAppointments;
+    const appointmentsToShow = schedulingSubTab === 'my'
+      ? therapistAppointments
+      : schedulingSubTab === 'unassigned'
+        ? unassignedAppointments
+        : appointmentsLog;
     const activeCount = therapistAppointments.filter((appt) => !['cancelled', 'no-show', 'completed'].includes(appt.status)).length;
     const completedCount = therapistAppointments.filter((appt) => appt.status === 'completed').length;
 
@@ -3265,15 +3283,36 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
                 {unassignedAppointments.length}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.appointmentsSwitchCard, schedulingSubTab === 'log' && styles.appointmentsSwitchCardActive]}
+              onPress={() => setSchedulingSubTab('log')}
+            >
+              <Ionicons name="receipt" size={18} color={schedulingSubTab === 'log' ? '#fff' : '#9f1239'} />
+              <Text style={[styles.appointmentsSwitchTitle, schedulingSubTab === 'log' && styles.appointmentsSwitchTitleActive]}>
+                Log
+              </Text>
+              <Text style={[styles.appointmentsSwitchCount, schedulingSubTab === 'log' && styles.appointmentsSwitchCountActive]}>
+                {appointmentsLog.length}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.tabHeader}>
           <Text style={styles.tabTitle}>
-              {schedulingSubTab === 'my' ? 'My Appointments' : 'Unassigned Appointments'}
+              {schedulingSubTab === 'my'
+                ? 'My Appointments'
+                : schedulingSubTab === 'unassigned'
+                  ? 'Unassigned Appointments'
+                  : 'All Appointments Log'}
           </Text>
           <Text style={styles.appointmentsHeaderMeta}>
-            {schedulingSubTab === 'my' ? 'Tap a card to update session details' : 'Review and claim open requests'}
+            {schedulingSubTab === 'my'
+              ? 'Tap a card to update session details'
+              : schedulingSubTab === 'unassigned'
+                ? 'Review and claim open requests'
+                : 'Chronological log of all appointments'}
           </Text>
         </View>
 
@@ -3283,12 +3322,18 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={60} color="#CCC" />
             <Text style={styles.emptyText}>
-              {schedulingSubTab === 'my' ? 'No appointments assigned' : 'No unassigned appointments'}
+              {schedulingSubTab === 'my'
+                ? 'No appointments assigned'
+                : schedulingSubTab === 'unassigned'
+                  ? 'No unassigned appointments'
+                  : 'No appointment log entries'}
             </Text>
             <Text style={styles.emptySubtext}>
-              {schedulingSubTab === 'my' 
-                ? 'Create a new appointment or check unassigned appointments' 
-                : 'All appointment requests have been assigned'}
+              {schedulingSubTab === 'my'
+                ? 'Create a new appointment or check unassigned appointments'
+                : schedulingSubTab === 'unassigned'
+                  ? 'All appointment requests have been assigned'
+                  : 'Appointments will appear here as they are created and updated'}
             </Text>
           </View>
         ) : (
@@ -3363,7 +3408,11 @@ const TherapistDashboard = ({ onLogout, onNavigate }) => {
 
                 <View style={styles.appointmentFooterRow}>
                   <Text style={styles.appointmentFooterHint}>
-                    {schedulingSubTab === 'my' ? 'Open to review or update this session' : 'Open request waiting for therapist assignment'}
+                    {schedulingSubTab === 'my'
+                      ? 'Open to review or update this session'
+                      : schedulingSubTab === 'unassigned'
+                        ? 'Open request waiting for therapist assignment'
+                        : 'Historical appointment record for therapist review'}
                   </Text>
 
                   {schedulingSubTab === 'unassigned' && (
@@ -5314,39 +5363,39 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f5d0d0',
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   tabNavigationHeader: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   tabNavigationTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
     color: '#7f1d1d',
   },
   tabNavigationHint: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#b45309',
-    marginTop: 3,
+    marginTop: 1,
   },
   segmentedTabs: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 6,
   },
   segmentedTab: {
     flex: 1,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#f5d0d0',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     shadowColor: '#7f1d1d',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   segmentedTabActive: {
     backgroundColor: '#C9302C',
@@ -5355,10 +5404,10 @@ const styles = StyleSheet.create({
   segmentedTabTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   segmentedTabTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
     color: '#9f1239',
   },
@@ -5366,9 +5415,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   segmentedTabSubtitle: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#881337',
-    marginTop: 8,
+    marginTop: 4,
   },
   segmentedTabSubtitleActive: {
     color: '#ffe4e6',
@@ -6514,8 +6563,8 @@ const styles = StyleSheet.create({
   appointmentsHero: {
     backgroundColor: '#fff7f7',
     paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 14,
+    paddingTop: 4,
+    paddingBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#f5d0d0',
   },
@@ -6523,74 +6572,76 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 4,
   },
   appointmentsHeroTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '800',
     color: '#7f1d1d',
   },
   appointmentsHeroSubtitle: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 0,
+    fontSize: 9,
     color: '#9a3412',
-    lineHeight: 18,
-    maxWidth: 230,
+    lineHeight: 11,
+    maxWidth: 130,
   },
   appointmentsCreateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#C9302C',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 7,
+    gap: 3,
   },
   appointmentsKpiRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 16,
+    gap: 6,
+    marginTop: 4,
   },
   appointmentsKpiCard: {
     width: '47%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: '#f3d4d4',
   },
   appointmentsKpiValue: {
-    fontSize: 22,
+    fontSize: 14,
     fontWeight: '800',
     color: '#1f2937',
   },
   appointmentsKpiLabel: {
-    fontSize: 12,
+    fontSize: 9,
     color: '#6b7280',
-    marginTop: 6,
+    marginTop: 2,
   },
   appointmentsSwitchRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
+    gap: 6,
+    marginTop: 4,
   },
   appointmentsSwitchCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#f5d0d0',
-    padding: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     alignItems: 'center',
-    gap: 6,
+    gap: 2,
   },
   appointmentsSwitchCardActive: {
     backgroundColor: '#C9302C',
     borderColor: '#C9302C',
   },
   appointmentsSwitchTitle: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '800',
     color: '#9f1239',
   },
@@ -6598,7 +6649,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   appointmentsSwitchCount: {
-    fontSize: 22,
+    fontSize: 13,
     fontWeight: '800',
     color: '#7f1d1d',
   },

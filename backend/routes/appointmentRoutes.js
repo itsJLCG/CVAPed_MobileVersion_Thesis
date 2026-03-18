@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, therapistOnly } = require('../middleware/auth');
 const {
   getTherapistAppointments,
+  getAllAppointmentsLog,
   getUnassignedAppointments,
   assignToAppointment,
   createTherapistAppointment,
@@ -27,6 +28,7 @@ const {
 // GET  /api/therapist/patients/search         - Search patients
 
 router.get('/therapist/appointments/unassigned', protect, therapistOnly, getUnassignedAppointments);
+router.get('/therapist/appointments/log', protect, therapistOnly, getAllAppointmentsLog);
 router.get('/therapist/appointments', protect, therapistOnly, getTherapistAppointments);
 router.post('/therapist/appointments', protect, therapistOnly, createTherapistAppointment);
 router.put('/therapist/appointments/:id/assign', protect, therapistOnly, assignToAppointment);

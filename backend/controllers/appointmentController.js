@@ -47,6 +47,45 @@ exports.getTherapistAppointments = async (req, res) => {
   }
 };
 
+// @desc    Get all appointments log for therapist dashboard
+// @route   GET /api/therapist/appointments/log
+// @access  Private (Therapist only)
+exports.getAllAppointmentsLog = async (req, res) => {
+  try {
+    const { status, therapy_type, limit } = req.query;
+
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (therapy_type) {
+      query.therapy_type = therapy_type;
+    }
+
+    const parsedLimit = parseInt(limit, 10);
+    const limitValue = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 100;
+
+    const appointments = await Appointment.find(query)
+      .sort({ appointment_date: -1, created_at: -1 })
+      .limit(limitValue);
+
+    return res.status(200).json({
+      success: true,
+      appointments,
+      count: appointments.length
+    });
+  } catch (error) {
+    console.error('❌ Error fetching appointment log:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointment log',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Get unassigned active appointments
 // @route   GET /api/therapist/appointments/unassigned
 // @access  Private (Therapist only)

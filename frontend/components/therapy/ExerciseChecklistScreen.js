@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,7 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [markingComplete, setMarkingComplete] = useState(false);
 
-  useEffect(() => {
-    loadPlanDetails();
-  }, []);
-
-  const loadPlanDetails = async () => {
+  const loadPlanDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await exerciseApi.getTodaysPlan();
@@ -34,7 +30,11 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPlanDetails();
+  }, [loadPlanDetails]);
 
   const handleExercisePress = (exercise) => {
     if (exercise.completed) {
@@ -155,7 +155,7 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
 
   if (loading || !plan) {
     return (
-      <SafeAreaWrapper>
+      <SafeAreaWrapper style={styles.safeArea} disableTopInset>
         <View style={styles.loadingContainer}>
           <Text>Loading exercises...</Text>
         </View>
@@ -168,7 +168,7 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
   const totalCount = plan.total_exercises;
 
   return (
-    <SafeAreaWrapper>
+    <SafeAreaWrapper style={styles.safeArea} disableTopInset>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -181,6 +181,7 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
+        <ScrollView style={styles.contentScroll} contentContainerStyle={styles.contentScrollContainer}>
         {/* Progress Card */}
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
@@ -201,24 +202,8 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
           )}
         </View>
 
-        {/* Coming Soon Notice */}
-        <View style={styles.comingSoonBanner}>
-          <View style={styles.bannerIconContainer}>
-            <Ionicons name="hardware-chip" size={32} color="#FFFFFF" />
-          </View>
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>🤖 AI-Powered Exercise Tracking</Text>
-            <Text style={styles.bannerSubtitle}>
-              MediaPipe AI + Wearable Sensors Coming Soon!
-            </Text>
-          </View>
-          <View style={styles.testingBadge}>
-            <Text style={styles.testingBadgeText}>TESTING MODE</Text>
-          </View>
-        </View>
-
         {/* Exercise List */}
-        <ScrollView style={styles.exerciseList}>
+        <View style={styles.exerciseList}>
           {plan.exercises.map((exercise, index) => (
             <TouchableOpacity
               key={exercise.exercise_id}
@@ -256,7 +241,7 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
               </View>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* Complete Session Button */}
         {plan.all_exercises_completed && (
@@ -277,15 +262,26 @@ const ExerciseChecklistScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         )}
+        </ScrollView>
       </View>
     </SafeAreaWrapper>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: '#FFFFFF',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentScroll: {
+    flex: 1,
+  },
+  contentScrollContainer: {
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -373,58 +369,7 @@ const styles = StyleSheet.create({
     color: '#065F46',
     marginLeft: 6,
   },
-  comingSoonBanner: {
-    backgroundColor: '#C9302C',
-    padding: 18,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#C9302C',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  bannerIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  bannerContent: {
-    flex: 1,
-  },
-  bannerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  bannerSubtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FEF3C7',
-  },
-  testingBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  testingBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#92400E',
-    letterSpacing: 0.5,
-  },
   exerciseList: {
-    flex: 1,
     paddingHorizontal: 16,
   },
   exerciseItem: {

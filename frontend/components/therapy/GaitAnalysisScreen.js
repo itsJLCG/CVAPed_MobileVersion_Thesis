@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
+  Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -52,6 +53,7 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   const deviceMotionSubscription = useRef(null);
   const pedometerSubscription = useRef(null);
   const timerInterval = useRef(null);
+  const vibrationInterval = useRef(null);
 
   const downsampleSensorSeries = (samples, limit = MAX_SENSOR_SAMPLES) => {
     if (!Array.isArray(samples) || samples.length <= limit) {
@@ -82,7 +84,24 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isRecording]);
+  }, [isRecording, pulseAnim]);
+
+  useEffect(() => {
+    if (isRecording && recordingTime >= 30) {
+      if (!vibrationInterval.current) {
+        Vibration.vibrate(300);
+        vibrationInterval.current = setInterval(() => {
+          Vibration.vibrate(300);
+        }, 1400);
+      }
+    } else if (vibrationInterval.current) {
+      clearInterval(vibrationInterval.current);
+      vibrationInterval.current = null;
+      Vibration.cancel();
+    }
+
+    return undefined;
+  }, [isRecording, recordingTime]);
 
   // Start recording sensor data
   const startRecording = async () => {
@@ -282,6 +301,12 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       timerInterval.current = null;
     }
 
+    if (vibrationInterval.current) {
+      clearInterval(vibrationInterval.current);
+      vibrationInterval.current = null;
+    }
+    Vibration.cancel();
+
     setIsRecording(false);
 
     // Check if we have enough data
@@ -416,12 +441,19 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
           message += '\n' + (errorData.recommendation || 'Please try again with a longer walk.');
           
           setAnalysisResult({
-            stepCount: steps.value || 0,
-            cadence: 0,
-            walkingSpeed: 0,
-            symmetryIndex: 0,
-            stabilityScore: 0,
-            stepLength: 0,
+            analysis_duration: duration.value || recordingTime,
+            data_quality: 'insufficient',
+            metrics: {
+              step_count: steps.value || 0,
+              cadence: 0,
+              velocity: 0,
+              gait_symmetry: 0,
+              stability_score: 0,
+              stride_length: 0,
+              step_regularity: 0,
+              vertical_oscillation: 0,
+              pedometer_steps: pedometerData.steps || 0,
+            },
             error: message,
             isValidationError: true,
           });
@@ -459,12 +491,19 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       
       // Handle other errors
       setAnalysisResult({
-        stepCount: 0,
-        cadence: 0,
-        walkingSpeed: 0,
-        symmetryIndex: 0,
-        stabilityScore: 0,
-        stepLength: 0,
+        analysis_duration: recordingTime,
+        data_quality: 'error',
+        metrics: {
+          step_count: 0,
+          cadence: 0,
+          velocity: 0,
+          gait_symmetry: 0,
+          stability_score: 0,
+          stride_length: 0,
+          step_regularity: 0,
+          vertical_oscillation: 0,
+          pedometer_steps: pedometerData.steps || 0,
+        },
         error: error.message,
       });
       
@@ -508,6 +547,10 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
       }
+      if (vibrationInterval.current) {
+        clearInterval(vibrationInterval.current);
+      }
+      Vibration.cancel();
     };
   }, []);
 
@@ -888,8 +931,8 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
                   {analysisResult.problem_summary?.summary}
                 </Text>
 
-                {analysisResult.detected_problems.map((problem, index) => (
-                  <View key={index} style={styles.problemCard}>
+                {analysisResult.detected_problems.map((problem) => (
+                  <View key={problem.problem || problem.category} style={styles.problemCard}>
                     <View style={styles.problemHeader}>
                       <Text style={styles.problemCategory}>{problem.category}</Text>
                       <View style={[
@@ -923,8 +966,8 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
                     <Text style={styles.impactText}>{problem.impact}</Text>
 
                     <Text style={styles.recommendationsTitle}>Recommended Exercises:</Text>
-                    {problem.recommendations.slice(0, 3).map((rec, idx) => (
-                      <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
+                    {problem.recommendations.slice(0, 3).map((rec) => (
+                      <Text key={`${problem.problem || problem.category}-${rec}`} style={styles.recommendationItem}>• {rec}</Text>
                     ))}
                   </View>
                 ))}

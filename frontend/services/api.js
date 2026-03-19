@@ -143,14 +143,31 @@ export const authAPI = {
     try {
       const response = await api.put('/auth/diagnostic-status', { hasInitialDiagnostic });
       if (response.data.data) {
-        // Update stored user data with new diagnostic status
         const storedUserData = await AsyncStorage.getItem('userData');
-        if (storedUserData) {
-          const userData = JSON.parse(storedUserData);
-          userData.hasInitialDiagnostic = response.data.data.hasInitialDiagnostic;
-          userData.diagnosticStatusUpdatedAt = response.data.data.diagnosticStatusUpdatedAt;
-          await AsyncStorage.setItem('userData', JSON.stringify(userData));
-        }
+        const existingUserData = storedUserData ? JSON.parse(storedUserData) : {};
+        await AsyncStorage.setItem('userData', JSON.stringify({
+          ...existingUserData,
+          ...response.data.data,
+          token: existingUserData.token,
+        }));
+      }
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: error.message || 'Unknown error' };
+    }
+  },
+
+  saveDiagnosticData: async (diagnosticData) => {
+    try {
+      const response = await api.put('/auth/diagnostic-data', diagnosticData);
+      if (response.data.data) {
+        const storedUserData = await AsyncStorage.getItem('userData');
+        const existingUserData = storedUserData ? JSON.parse(storedUserData) : {};
+        await AsyncStorage.setItem('userData', JSON.stringify({
+          ...existingUserData,
+          ...response.data.data,
+          token: existingUserData.token,
+        }));
       }
       return response.data;
     } catch (error) {

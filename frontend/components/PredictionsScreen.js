@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2C3E50',
     textAlign: 'center',
   },
   headerRight: {

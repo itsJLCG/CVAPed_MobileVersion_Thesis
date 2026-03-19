@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
+  Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -21,6 +22,8 @@ import {
   Pedometer 
 } from 'expo-sensors';
 import gaitAnalysisAPI from '../../services/gaitApi';
+
+const MAX_SENSOR_SAMPLES = 1200;
 
 const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   // Animation
@@ -50,6 +53,16 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
   const deviceMotionSubscription = useRef(null);
   const pedometerSubscription = useRef(null);
   const timerInterval = useRef(null);
+  const vibrationInterval = useRef(null);
+
+  const downsampleSensorSeries = (samples, limit = MAX_SENSOR_SAMPLES) => {
+    if (!Array.isArray(samples) || samples.length <= limit) {
+      return samples;
+    }
+
+    const step = Math.ceil(samples.length / limit);
+    return samples.filter((_, index) => index % step === 0).slice(0, limit);
+  };
 
   // Pulse animation for recording button
   useEffect(() => {
@@ -71,7 +84,24 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isRecording]);
+  }, [isRecording, pulseAnim]);
+
+  useEffect(() => {
+    if (isRecording && recordingTime >= 30) {
+      if (!vibrationInterval.current) {
+        Vibration.vibrate(300);
+        vibrationInterval.current = setInterval(() => {
+          Vibration.vibrate(300);
+        }, 1400);
+      }
+    } else if (vibrationInterval.current) {
+      clearInterval(vibrationInterval.current);
+      vibrationInterval.current = null;
+      Vibration.cancel();
+    }
+
+    return undefined;
+  }, [isRecording, recordingTime]);
 
   // Start recording sensor data
   const startRecording = async () => {
@@ -271,6 +301,12 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       timerInterval.current = null;
     }
 
+    if (vibrationInterval.current) {
+      clearInterval(vibrationInterval.current);
+      vibrationInterval.current = null;
+    }
+    Vibration.cancel();
+
     setIsRecording(false);
 
     // Check if we have enough data
@@ -318,12 +354,18 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       console.log('Recording duration:', recordingTime, 'seconds');
       
       // Prepare data for backend - match the Python backend format
+      const trimmedAccelerometer = downsampleSensorSeries(sensorData.accelerometer);
+      const trimmedGyroscope = downsampleSensorSeries(sensorData.gyroscope);
+      const trimmedMagnetometer = downsampleSensorSeries(sensorData.magnetometer);
+      const trimmedBarometer = downsampleSensorSeries(sensorData.barometer);
+      const trimmedDeviceMotion = downsampleSensorSeries(sensorData.deviceMotion);
+
       const requestData = {
-        accelerometer: sensorData.accelerometer,
-        gyroscope: sensorData.gyroscope,
-        magnetometer: sensorData.magnetometer.length > 0 ? sensorData.magnetometer : undefined,
-        barometer: sensorData.barometer.length > 0 ? sensorData.barometer : undefined,
-        deviceMotion: sensorData.deviceMotion.length > 0 ? sensorData.deviceMotion : undefined,
+        accelerometer: trimmedAccelerometer,
+        gyroscope: trimmedGyroscope,
+        magnetometer: trimmedMagnetometer.length > 0 ? trimmedMagnetometer : undefined,
+        barometer: trimmedBarometer.length > 0 ? trimmedBarometer : undefined,
+        deviceMotion: trimmedDeviceMotion.length > 0 ? trimmedDeviceMotion : undefined,
         pedometer: pedometerData.steps > 0 ? {
           steps: pedometerData.steps,
           startTime: pedometerData.start,
@@ -340,6 +382,12 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
         deviceMotion_samples: requestData.deviceMotion?.length || 0,
         pedometer_steps: requestData.pedometer?.steps || 0,
         session_id: requestData.session_id,
+        was_downsampled:
+          sensorData.accelerometer.length !== requestData.accelerometer.length ||
+          sensorData.gyroscope.length !== requestData.gyroscope.length ||
+          sensorData.magnetometer.length !== (requestData.magnetometer?.length || 0) ||
+          sensorData.barometer.length !== (requestData.barometer?.length || 0) ||
+          sensorData.deviceMotion.length !== (requestData.deviceMotion?.length || 0)
       });
 
       const result = await gaitAnalysisAPI.analyzeGait(requestData);
@@ -393,12 +441,19 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
           message += '\n' + (errorData.recommendation || 'Please try again with a longer walk.');
           
           setAnalysisResult({
-            stepCount: steps.value || 0,
-            cadence: 0,
-            walkingSpeed: 0,
-            symmetryIndex: 0,
-            stabilityScore: 0,
-            stepLength: 0,
+            analysis_duration: duration.value || recordingTime,
+            data_quality: 'insufficient',
+            metrics: {
+              step_count: steps.value || 0,
+              cadence: 0,
+              velocity: 0,
+              gait_symmetry: 0,
+              stability_score: 0,
+              stride_length: 0,
+              step_regularity: 0,
+              vertical_oscillation: 0,
+              pedometer_steps: pedometerData.steps || 0,
+            },
             error: message,
             isValidationError: true,
           });
@@ -436,12 +491,19 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       
       // Handle other errors
       setAnalysisResult({
-        stepCount: 0,
-        cadence: 0,
-        walkingSpeed: 0,
-        symmetryIndex: 0,
-        stabilityScore: 0,
-        stepLength: 0,
+        analysis_duration: recordingTime,
+        data_quality: 'error',
+        metrics: {
+          step_count: 0,
+          cadence: 0,
+          velocity: 0,
+          gait_symmetry: 0,
+          stability_score: 0,
+          stride_length: 0,
+          step_regularity: 0,
+          vertical_oscillation: 0,
+          pedometer_steps: pedometerData.steps || 0,
+        },
         error: error.message,
       });
       
@@ -485,6 +547,10 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
       }
+      if (vibrationInterval.current) {
+        clearInterval(vibrationInterval.current);
+      }
+      Vibration.cancel();
     };
   }, []);
 
@@ -865,8 +931,8 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
                   {analysisResult.problem_summary?.summary}
                 </Text>
 
-                {analysisResult.detected_problems.map((problem, index) => (
-                  <View key={index} style={styles.problemCard}>
+                {analysisResult.detected_problems.map((problem) => (
+                  <View key={problem.problem || problem.category} style={styles.problemCard}>
                     <View style={styles.problemHeader}>
                       <Text style={styles.problemCategory}>{problem.category}</Text>
                       <View style={[
@@ -900,8 +966,8 @@ const GaitAnalysisScreen = ({ onBack, onNavigateToExercisePlan }) => {
                     <Text style={styles.impactText}>{problem.impact}</Text>
 
                     <Text style={styles.recommendationsTitle}>Recommended Exercises:</Text>
-                    {problem.recommendations.slice(0, 3).map((rec, idx) => (
-                      <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
+                    {problem.recommendations.slice(0, 3).map((rec) => (
+                      <Text key={`${problem.problem || problem.category}-${rec}`} style={styles.recommendationItem}>• {rec}</Text>
                     ))}
                   </View>
                 ))}

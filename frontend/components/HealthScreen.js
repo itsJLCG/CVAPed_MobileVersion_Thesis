@@ -19,7 +19,7 @@ import { API_URL } from '../config/apiConfig';
 
 const { width } = Dimensions.get('window');
 
-const HealthScreen = ({ onBack }) => {
+const HealthScreen = ({ onBack, onOpenPredictions, onOpenPlan }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [healthLogs, setHealthLogs] = useState([]);
@@ -953,6 +953,34 @@ const HealthScreen = ({ onBack }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
+          <View style={styles.toolsCard}>
+            <View style={styles.toolsHeader}>
+              <View>
+                <Text style={styles.toolsTitle}>Insights & Planning</Text>
+                <Text style={styles.toolsSubtitle}>Open your predictions and prescriptive plan from one place.</Text>
+              </View>
+              <Ionicons name="sparkles" size={18} color="#C9302C" />
+            </View>
+
+            <View style={styles.toolsActionsRow}>
+              <TouchableOpacity style={styles.toolActionButton} onPress={onOpenPredictions} activeOpacity={0.85}>
+                <View style={[styles.toolActionIcon, { backgroundColor: '#fce7f3' }]}>
+                  <Ionicons name="analytics" size={18} color="#be185d" />
+                </View>
+                <Text style={styles.toolActionTitle}>Predictions</Text>
+                <Text style={styles.toolActionText}>Review mastery forecasts and recovery trends.</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.toolActionButton} onPress={onOpenPlan} activeOpacity={0.85}>
+                <View style={[styles.toolActionIcon, { backgroundColor: '#dcfce7' }]}>
+                  <Ionicons name="clipboard" size={18} color="#15803d" />
+                </View>
+                <Text style={styles.toolActionTitle}>Plan</Text>
+                <Text style={styles.toolActionText}>Open your prescriptive recommendations and next steps.</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Summary Card */}
           {renderSummaryCard()}
 
@@ -1194,6 +1222,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   headerLeft: {
     width: 34,
@@ -1202,7 +1235,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2C3E50',
     textAlign: 'center',
   },
   headerRight: {
@@ -1249,6 +1282,67 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  toolsCard: {
+    backgroundColor: '#FFFFFF',
+    margin: 15,
+    marginBottom: 0,
+    padding: 16,
+    borderRadius: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  toolsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+    gap: 12,
+  },
+  toolsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  toolsSubtitle: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  toolsActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  toolActionButton: {
+    flex: 1,
+    backgroundColor: '#fafafa',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#f1f1f1',
+  },
+  toolActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  toolActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#222',
+  },
+  toolActionText: {
+    fontSize: 12,
+    color: '#777',
+    lineHeight: 17,
+    marginTop: 6,
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',

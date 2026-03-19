@@ -110,14 +110,30 @@ const GaitProgressSchema = new mongoose.Schema({
     },
     category: String,
     description: String,
-    recommendations: [String]
+    current_value: Number,
+    normal_range: String,
+    percentile: Number,
+    impact: String,
+    recommendations: [String],
+    exercises: [mongoose.Schema.Types.Mixed]
   }],
   problem_summary: {
     overall_status: String,
     risk_level: String,
     total_problems: Number,
     severe_count: Number,
-    moderate_count: Number
+    moderate_count: Number,
+    summary: String
+  },
+  gait_score: {
+    score: Number,
+    grade: String,
+    grade_emoji: String,
+    color: String,
+    recommendation: String,
+    severe_count: Number,
+    moderate_count: Number,
+    metrics_evaluated: Number
   },
   created_at: {
     type: Date,

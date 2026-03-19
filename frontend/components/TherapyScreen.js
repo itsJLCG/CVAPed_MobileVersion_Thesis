@@ -8,78 +8,28 @@ import {
   ScrollView,
   Image,
   Modal,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhysicalTherapyScreen from './therapy/PhysicalTherapyScreen';
 import SpeechTherapyScreen from './therapy/SpeechTherapyScreen';
-import InitialDiagnosticModal from './InitialDiagnosticModal';
-import { authAPI } from '../services/api';
-import BottomNav from './BottomNav';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const TherapyScreen = ({ onBack, onNavigate }) => {
+const TherapyScreen = ({ onBack, initialTherapyType = null }) => {
   const [selectedTherapy, setSelectedTherapy] = useState(null);
-  const [activeTab, setActiveTab] = useState('therapy');
   const [showPhysicalTherapy, setShowPhysicalTherapy] = useState(false);
   const [showSpeechTherapy, setShowSpeechTherapy] = useState(false);
 
-  // Diagnostic modal state
-  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
-  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
-  const [diagnosticStatus, setDiagnosticStatus] = useState(null);
-  const [showBanner, setShowBanner] = useState(false);
-
-  // Check if user has already answered the diagnostic question
   useEffect(() => {
-    const checkDiagnosticStatus = async () => {
-      try {
-        const storedUserData = await AsyncStorage.getItem('userData');
-        if (storedUserData) {
-          const user = JSON.parse(storedUserData);
-          if (user.hasInitialDiagnostic == null) {
-            // Never answered — show modal
-            setShowDiagnosticModal(true);
-          } else if (user.hasInitialDiagnostic === true) {
-            // Already diagnosed
-            setDiagnosticStatus(true);
-          } else {
-            // Answered "No" — show guidance banner
-            setDiagnosticStatus(false);
-            setShowBanner(true);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking diagnostic status:', error);
-      }
-    };
-    checkDiagnosticStatus();
-  }, []);
-
-  const handleDiagnosticConfirm = async (hasVisited) => {
-    setDiagnosticLoading(true);
-    try {
-      await authAPI.updateDiagnosticStatus(hasVisited);
-      setShowDiagnosticModal(false);
-      setDiagnosticStatus(hasVisited);
-      if (hasVisited) {
-        Alert.alert('Thank You', 'Your diagnostic status has been recorded.');
-      } else {
-        Alert.alert(
-          'Recommendation',
-          'We recommend scheduling an initial diagnostic assessment at our facility.'
-        );
-        setShowBanner(true);
-      }
-    } catch (error) {
-      console.error('Error updating diagnostic status:', error);
-      Alert.alert('Error', 'Failed to save your response. Please try again.');
-    } finally {
-      setDiagnosticLoading(false);
+    if (initialTherapyType === 'physical') {
+      setShowPhysicalTherapy(true);
+      return;
     }
-  };
+
+    if (initialTherapyType === 'articulation' || initialTherapyType === 'language' || initialTherapyType === 'fluency') {
+      setShowSpeechTherapy(true);
+    }
+  }, [initialTherapyType]);
 
   const therapyTypes = [
     {
@@ -142,24 +92,21 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
   };
 
   const handleBackFromPhysicalTherapy = () => {
+    if (initialTherapyType === 'physical' && onBack) {
+      setShowPhysicalTherapy(false);
+      onBack();
+      return;
+    }
     setShowPhysicalTherapy(false);
   };
 
   const handleBackFromSpeechTherapy = () => {
-    setShowSpeechTherapy(false);
-  };
-
-  const handleTabPress = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'home' && onNavigate) {
-      onNavigate('home');
-    } else if (tab === 'therapy') {
-      // Already on therapy screen
-    } else if (tab === 'health' && onNavigate) {
-      onNavigate('health');
-    } else if (tab === 'profile' && onNavigate) {
-      onNavigate('profile');
+    if ((initialTherapyType === 'articulation' || initialTherapyType === 'language' || initialTherapyType === 'fluency') && onBack) {
+      setShowSpeechTherapy(false);
+      onBack();
+      return;
     }
+    setShowSpeechTherapy(false);
   };
 
   // Show Physical Therapy screen if selected
@@ -169,7 +116,7 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
 
   // Show Speech Therapy screen if selected
   if (showSpeechTherapy) {
-    return <SpeechTherapyScreen onBack={handleBackFromSpeechTherapy} />;
+    return <SpeechTherapyScreen onBack={handleBackFromSpeechTherapy} initialTherapyType={initialTherapyType} />;
   }
 
   return (
@@ -191,41 +138,6 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
           <Text style={styles.mainTitle}>Choose Your Therapy Type</Text>
           <Text style={styles.subtitle}>Select the therapy service you need</Text>
         </View>
-
-        {/* Guidance Banner for users without initial diagnostic */}
-        {diagnosticStatus === false && showBanner && (
-          <View style={styles.diagnosticBanner}>
-            <View style={styles.bannerContent}>
-              <View style={styles.bannerTextRow}>
-                <Ionicons name="information-circle" size={22} color="#1E40AF" />
-                <View style={styles.bannerTextContainer}>
-                  <Text style={styles.bannerTextBold}>No initial assessment on file.</Text>
-                  <Text style={styles.bannerText}>
-                    For the best therapy results, we recommend visiting our facility for a professional diagnostic assessment. You can still explore therapy exercises in the meantime.
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowBanner(false)}
-                  style={styles.bannerCloseBtn}
-                >
-                  <Ionicons name="close" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={styles.bannerActionBtn}
-                onPress={() => {
-                  if (onNavigate) {
-                    onNavigate('schedule');
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.bannerActionText}>Book Your Initial Assessment</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         <View style={styles.therapyGrid}>
           {therapyTypes.map((therapy) => (
@@ -336,8 +248,8 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
                 {/* Features (Physical Therapy) */}
                 {selectedTherapy.features && (
                   <View style={styles.featuresContainer}>
-                    {selectedTherapy.features.map((feature, index) => (
-                      <View key={index} style={styles.featureItem}>
+                    {selectedTherapy.features.map((feature) => (
+                      <View key={feature} style={styles.featureItem}>
                         <Text style={styles.checkmark}>✓</Text>
                         <Text style={styles.featureText}>{feature}</Text>
                       </View>
@@ -348,8 +260,8 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
                 {/* Therapy Types (Speech Therapy) */}
                 {selectedTherapy.therapyTypes && (
                   <View style={styles.therapyTypesContainer}>
-                    {selectedTherapy.therapyTypes.map((type, index) => (
-                      <View key={index} style={styles.therapyTypeItem}>
+                    {selectedTherapy.therapyTypes.map((type) => (
+                      <View key={type.name} style={styles.therapyTypeItem}>
                         <Text style={styles.therapyTypeName}>{type.name}</Text>
                         <Text style={styles.therapyTypeDesc}>{type.description}</Text>
                       </View>
@@ -371,16 +283,6 @@ const TherapyScreen = ({ onBack, onNavigate }) => {
         </View>
       </Modal>
 
-      {/* Bottom Navbar */}
-      <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
-
-      {/* Initial Diagnostic Check Modal */}
-      <InitialDiagnosticModal
-        isOpen={showDiagnosticModal}
-        onClose={() => setShowDiagnosticModal(false)}
-        onConfirm={handleDiagnosticConfirm}
-        loading={diagnosticLoading}
-      />
     </View>
   );
 };

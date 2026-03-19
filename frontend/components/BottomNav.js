@@ -49,34 +49,6 @@ const BottomNav = ({ activeTab, onTabPress }) => {
 
       <TouchableOpacity 
         style={styles.navItem}
-        onPress={() => onTabPress('predictions')}
-      >
-        <Ionicons 
-          name={activeTab === 'predictions' ? 'analytics' : 'analytics-outline'} 
-          size={26} 
-          color={activeTab === 'predictions' ? '#C9302C' : '#666'} 
-        />
-        <Text style={[styles.navText, activeTab === 'predictions' && styles.navTextActive]}>
-          Predict
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.navItem}
-        onPress={() => onTabPress('prescriptive')}
-      >
-        <Ionicons 
-          name={activeTab === 'prescriptive' ? 'clipboard' : 'clipboard-outline'} 
-          size={26} 
-          color={activeTab === 'prescriptive' ? '#C9302C' : '#666'} 
-        />
-        <Text style={[styles.navText, activeTab === 'prescriptive' && styles.navTextActive]}>
-          Plan
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.navItem}
         onPress={() => onTabPress('schedule')}
       >
         <Ionicons 
@@ -84,8 +56,8 @@ const BottomNav = ({ activeTab, onTabPress }) => {
           size={26} 
           color={activeTab === 'schedule' ? '#C9302C' : '#666'} 
         />
-        <Text style={[styles.navText, activeTab === 'schedule' && styles.navTextActive]}>
-          Schedule
+        <Text style={[styles.navText, styles.navTextCompact, activeTab === 'schedule' && styles.navTextActive]} numberOfLines={2}>
+          Appointments
         </Text>
       </TouchableOpacity>
 
@@ -131,6 +103,12 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
     fontWeight: '500',
+    textAlign: 'center',
+  },
+  navTextCompact: {
+    fontSize: 9,
+    lineHeight: 10,
+    maxWidth: 52,
   },
   navTextActive: {
     color: '#C9302C',

@@ -95,11 +95,15 @@ router.post('/analyze', protect, async (req, res) => {
       const analysisData = response.data.data;
       const metrics = analysisData.metrics;
       const duration = analysisData.analysis_duration;
-      const stepCount = metrics.step_count;
-      
+      const sensorStepCount = Number(metrics.step_count || 0);
+      const pedometerStepCount = Number(metrics.pedometer_steps || pedometer?.steps || 0);
+      const stepCount = Math.max(sensorStepCount, pedometerStepCount);
+
+      metrics.step_count = stepCount;
+
       // VALIDATION RULES
       const MIN_DURATION = 30; // seconds
-      const MIN_STEPS = 20;
+      const MIN_STEPS = 15;
       
       const isValid = duration >= MIN_DURATION && stepCount >= MIN_STEPS;
       

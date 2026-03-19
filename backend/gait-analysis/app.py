@@ -259,6 +259,7 @@ def detect_problems():
         
         # Generate summary
         summary = problem_detector.generate_summary(prioritized)
+        gait_score = problem_detector.calculate_gait_score(metrics, prioritized)
         
         print(f"\nProblems detected: {len(prioritized)}")
         if prioritized:
@@ -270,6 +271,7 @@ def detect_problems():
             'problems_detected': len(prioritized),
             'problems': prioritized,
             'summary': summary,
+            'gait_score': gait_score,
             'timestamp': datetime.now().isoformat()
         }), 200
         

@@ -1,185 +1,216 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  Alert,
   ActivityIndicator,
-  Dimensions,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { authAPI } from '../services/api';
-
-const { width } = Dimensions.get('window');
+import InitialDiagnosticModal from './InitialDiagnosticModal';
+import InitialDiagnosticDetailsModal from './InitialDiagnosticDetailsModal';
+import { getLabel } from '../utils/initialDiagnostic';
 
 const ProfileScreen = ({ userData, onBack, onLogout }) => {
+  const [currentUserData, setCurrentUserData] = useState(userData || null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  // Personal Information
+  const [showDiagnosticWizard, setShowDiagnosticWizard] = useState(false);
+  const [showDiagnosticDetails, setShowDiagnosticDetails] = useState(false);
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const [firstName, setFirstName] = useState(userData?.firstName || '');
   const [lastName, setLastName] = useState(userData?.lastName || '');
   const [email, setEmail] = useState(userData?.email || '');
-  
-  // Get phone from any available source
-  const getPhoneNumber = () => {
-    // Priority order: user.phone -> parentInfo.phone -> patientInfo.phone
-    if (userData?.phone) {
-      return userData.phone;
-    } else if (userData?.parentInfo?.phone) {
-      return userData.parentInfo.phone;
-    } else if (userData?.patientInfo?.phone) {
-      return userData.patientInfo.phone;
+  const [phone, setPhone] = useState('');
+
+  const syncUserState = async (nextUserData) => {
+    setCurrentUserData(nextUserData);
+    setFirstName(nextUserData?.firstName || '');
+    setLastName(nextUserData?.lastName || '');
+    setEmail(nextUserData?.email || '');
+    setPhone(
+      nextUserData?.phone ||
+      nextUserData?.parentInfo?.phone ||
+      nextUserData?.patientInfo?.phone ||
+      ''
+    );
+
+    if (nextUserData) {
+      await AsyncStorage.setItem('userData', JSON.stringify(nextUserData));
     }
-    return '';
   };
-  
-  const [phone, setPhone] = useState(getPhoneNumber());
+
+  useEffect(() => {
+    if (userData) {
+      syncUserState(userData);
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    const loadStoredUser = async () => {
+      try {
+        const storedUserData = await AsyncStorage.getItem('userData');
+        if (storedUserData) {
+          await syncUserState(JSON.parse(storedUserData));
+        }
+      } catch (error) {
+        console.error('Error loading stored user data:', error);
+      }
+    };
+
+    loadStoredUser();
+  }, []);
+
+  const diagnosticData = currentUserData?.diagnosticData;
+
+  const diagnosticSummary = useMemo(() => {
+    if (!diagnosticData?.completedWizard) {
+      return null;
+    }
+
+    return {
+      therapyFocus: getLabel('therapyFocus', diagnosticData.therapyFocus),
+      facilityStatus: diagnosticData.hasInitialDiagnostic ? 'Completed' : 'Not yet completed',
+      recommendedTherapy: getLabel('recommendedTherapy', diagnosticData.recommendedTherapy),
+      recommendedLevel: diagnosticData.recommendedLevelName || getLabel('recommendedLevel', diagnosticData.recommendedLevel),
+      recommendedFocus: diagnosticData.recommendedFocus || 'Not available',
+    };
+  }, [diagnosticData]);
 
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      // Check if we have a token
-      if (!userData?.token) {
+      if (!currentUserData?.token) {
         Alert.alert('Error', 'Authentication token not found. Please login again.');
         setLoading(false);
         return;
       }
 
-      console.log('Updating profile with token:', userData.token.substring(0, 20) + '...');
-      console.log('Update data:', { firstName, lastName, phone });
-
-      const response = await authAPI.updateProfile(userData.token, {
+      const response = await authAPI.updateProfile(currentUserData.token, {
         firstName,
         lastName,
-        phone
+        phone,
       });
-      
-      console.log('Update response:', response);
-      
-      if (response.success) {
-        Alert.alert('Success', 'Profile updated successfully!');
+
+      if (response.success && response.data) {
+        const mergedUser = {
+          ...currentUserData,
+          ...response.data,
+          token: currentUserData.token,
+        };
+
+        await syncUserState(mergedUser);
         setIsEditing(false);
-        
-        // Update parent component with new data
-        if (response.data) {
-          console.log('Updated user data:', response.data);
-        }
+        Alert.alert('Success', 'Profile updated successfully!');
       } else {
         Alert.alert('Error', response.message || 'Failed to update profile');
       }
     } catch (error) {
-      console.error('Update profile error:', error);
-      
-      // Better error handling
-      let errorMessage = 'Failed to update profile. Please try again.';
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error.message) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancelEdit = () => {
-    // Reset to original values
-    setFirstName(userData?.firstName || '');
-    setLastName(userData?.lastName || '');
-    setEmail(userData?.email || '');
-    setPhone(getPhoneNumber());
+    setFirstName(currentUserData?.firstName || '');
+    setLastName(currentUserData?.lastName || '');
+    setEmail(currentUserData?.email || '');
+    setPhone(
+      currentUserData?.phone ||
+      currentUserData?.parentInfo?.phone ||
+      currentUserData?.patientInfo?.phone ||
+      ''
+    );
     setIsEditing(false);
   };
 
+  const handleSaveDiagnostic = async (wizardPayload) => {
+    setDiagnosticLoading(true);
+    try {
+      const response = await authAPI.saveDiagnosticData(wizardPayload);
+      const nextUserData = {
+        ...currentUserData,
+        ...response.data.data,
+        token: currentUserData?.token,
+      };
+
+      await syncUserState(nextUserData);
+      setShowDiagnosticWizard(false);
+      Alert.alert('Diagnostic Saved', 'Your initial diagnostic has been updated successfully.');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to save diagnostic data.');
+    } finally {
+      setDiagnosticLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Sign out from Google if signed in with Google
-              if (userData?.googleId) {
-                try {
-                  await GoogleSignin.signOut();
-                } catch (error) {
-                  console.log('Google sign out error:', error);
-                }
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (currentUserData?.googleId) {
+              try {
+                await GoogleSignin.signOut();
+              } catch (error) {
+                console.log('Google sign out error:', error);
               }
-              
-              // Clear user session and navigate to login
-              if (onLogout) {
-                onLogout();
-              }
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout properly');
             }
+
+            if (onLogout) {
+              onLogout();
+            }
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Error', 'Failed to logout properly');
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft} />
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerRight}>
-          {!isEditing && (
+          {!isEditing ? (
             <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
               <Ionicons name="create-outline" size={24} color="#C9302C" />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Picture Section */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            {userData?.picture ? (
-              <Image 
-                source={{ uri: userData.picture }} 
-                style={styles.avatar}
-              />
+            {currentUserData?.picture ? (
+              <Image source={{ uri: currentUserData.picture }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="person" size={50} color="#FFFFFF" />
               </View>
             )}
-            {isEditing && (
-              <TouchableOpacity style={styles.cameraButton}>
-                <Ionicons name="camera" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
           </View>
-          <Text style={styles.userName}>
-            {firstName} {lastName}
-          </Text>
+          <Text style={styles.userName}>{firstName} {lastName}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{userData?.role || 'Patient'}</Text>
+            <Text style={styles.roleText}>{currentUserData?.role || 'Patient'}</Text>
           </View>
         </View>
 
-        {/* Personal Information Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="person-outline" size={24} color="#C9302C" />
@@ -188,52 +219,27 @@ const ProfileScreen = ({ userData, onBack, onLogout }) => {
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>First Name</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.inputDisabled]}
-              value={firstName}
-              onChangeText={setFirstName}
-              editable={isEditing}
-              placeholder="Enter first name"
-            />
+            <TextInput style={[styles.input, !isEditing && styles.inputDisabled]} value={firstName} onChangeText={setFirstName} editable={isEditing} />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Last Name</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.inputDisabled]}
-              value={lastName}
-              onChangeText={setLastName}
-              editable={isEditing}
-              placeholder="Enter last name"
-            />
+            <TextInput style={[styles.input, !isEditing && styles.inputDisabled]} value={lastName} onChangeText={setLastName} editable={isEditing} />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Email Address</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={email}
-              editable={false}
-              placeholder="Email address"
-            />
+            <TextInput style={[styles.input, styles.inputDisabled]} value={email} editable={false} />
             <Text style={styles.helperText}>Email cannot be changed</Text>
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Phone Number</Text>
-            <TextInput
-              style={[styles.input, !isEditing && styles.inputDisabled]}
-              value={phone}
-              onChangeText={setPhone}
-              editable={isEditing}
-              placeholder="Enter phone number"
-              keyboardType="phone-pad"
-            />
+            <TextInput style={[styles.input, !isEditing && styles.inputDisabled]} value={phone} onChangeText={setPhone} editable={isEditing} keyboardType="phone-pad" />
           </View>
         </View>
 
-        {/* Therapy Information Card */}
-        {userData?.therapyType && (
+        {currentUserData?.therapyType ? (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="medkit-outline" size={24} color="#C9302C" />
@@ -242,60 +248,108 @@ const ProfileScreen = ({ userData, onBack, onLogout }) => {
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Therapy Type</Text>
-              <Text style={styles.infoValue}>
-                {userData.therapyType === 'speech' ? 'Speech Therapy' : 'Physical Therapy'}
-              </Text>
+              <Text style={styles.infoValue}>{currentUserData.therapyType === 'speech' ? 'Speech Therapy' : 'Physical Therapy'}</Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Patient Type</Text>
               <Text style={styles.infoValue}>
-                {userData.patientType === 'myself' ? 'Myself' : 
-                 userData.patientType === 'child' ? 'Child' : 'Dependent'}
+                {currentUserData.patientType === 'myself'
+                  ? 'Myself'
+                  : currentUserData.patientType === 'child'
+                    ? 'Child'
+                    : 'Dependent'}
               </Text>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Action Buttons */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="clipboard-outline" size={24} color="#C9302C" />
+            <Text style={styles.cardTitle}>Initial Diagnostic</Text>
+          </View>
+
+          {diagnosticSummary ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Therapy Focus</Text>
+                <Text style={styles.infoValue}>{diagnosticSummary.therapyFocus}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Facility Assessment</Text>
+                <Text style={styles.infoValue}>{diagnosticSummary.facilityStatus}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Recommended Therapy</Text>
+                <Text style={styles.infoValue}>{diagnosticSummary.recommendedTherapy}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Recommended Level</Text>
+                <Text style={styles.infoValue}>{diagnosticSummary.recommendedLevel}</Text>
+              </View>
+              <View style={styles.infoRowLast}>
+                <Text style={styles.infoLabel}>Recommended Focus</Text>
+                <Text style={[styles.infoValue, styles.multilineValue]}>{diagnosticSummary.recommendedFocus}</Text>
+              </View>
+
+              <View style={styles.diagnosticActions}>
+                <TouchableOpacity style={styles.secondaryActionButton} onPress={() => setShowDiagnosticDetails(true)}>
+                  <Ionicons name="eye-outline" size={18} color="#1D4ED8" />
+                  <Text style={styles.secondaryActionText}>View Initial Diagnostic</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.primaryActionButton} onPress={() => setShowDiagnosticWizard(true)}>
+                  <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryActionText}>Update Diagnostic</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyDiagnosticText}>
+                Complete the initial diagnostic to unlock the extracted therapy selection logic and recommendations from CVAPed Web.
+              </Text>
+              <TouchableOpacity style={styles.primaryActionButtonFull} onPress={() => setShowDiagnosticWizard(true)}>
+                <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>Complete Initial Diagnostic</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         {isEditing ? (
           <View style={styles.editActions}>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCancelEdit}
-              disabled={loading}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEdit} disabled={loading}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.saveButton}
-              onPress={handleSaveProfile}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              )}
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={loading}>
+              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         )}
 
-        {/* App Version */}
         <Text style={styles.versionText}>CVACare Mobile v1.0.0</Text>
-
-        {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      <InitialDiagnosticModal
+        isOpen={showDiagnosticWizard}
+        onClose={() => setShowDiagnosticWizard(false)}
+        onConfirm={handleSaveDiagnostic}
+        loading={diagnosticLoading}
+        initialData={diagnosticData}
+      />
+
+      <InitialDiagnosticDetailsModal
+        visible={showDiagnosticDetails}
+        onClose={() => setShowDiagnosticDetails(false)}
+        diagnosticData={diagnosticData}
+      />
     </View>
   );
 };
@@ -364,19 +418,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#C9302C',
-  },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#C9302C',
-    borderRadius: 18,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
   },
   userName: {
     fontSize: 24,
@@ -456,28 +497,76 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
+  infoRowLast: {
+    paddingVertical: 12,
+  },
   infoLabel: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
+    flex: 1,
   },
   infoValue: {
     fontSize: 14,
     color: '#2C3E50',
     fontWeight: '600',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  settingText: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 15,
+    textAlign: 'right',
+  },
+  multilineValue: {
+    lineHeight: 20,
+  },
+  emptyDiagnosticText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  diagnosticActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  secondaryActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    paddingVertical: 12,
+    backgroundColor: '#EFF6FF',
+  },
+  secondaryActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1D4ED8',
+  },
+  primaryActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 8,
+    paddingVertical: 12,
+    backgroundColor: '#C9302C',
+  },
+  primaryActionButtonFull: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 8,
+    paddingVertical: 12,
+    backgroundColor: '#C9302C',
+  },
+  primaryActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   editActions: {
     flexDirection: 'row',

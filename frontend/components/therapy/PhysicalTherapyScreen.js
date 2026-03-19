@@ -41,7 +41,7 @@ const PhysicalTherapyScreen = ({ onBack }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   const handleMobileDevice = async () => {
     try {
@@ -138,6 +138,9 @@ const PhysicalTherapyScreen = ({ onBack }) => {
               setExercisePlanId(params.planId);
               setShowExercisePlan(false);
               setShowExerciseChecklist(true);
+            } else if (screen === 'GaitAnalysis') {
+              setShowExercisePlan(false);
+              setShowGaitAnalysis(true);
             }
           }
         }} 

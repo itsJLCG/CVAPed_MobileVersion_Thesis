@@ -103,7 +103,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: null
   },
+  diagnosticData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   diagnosticStatusUpdatedAt: {
+    type: Date,
+    default: null
+  },
+  diagnosticProfileUpdatedAt: {
     type: Date,
     default: null
   },
